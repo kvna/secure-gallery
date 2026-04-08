@@ -1,0 +1,54 @@
+# Galleries — personal data, never commit
+galleries/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+gallery-env/
+
+# Images
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.tiff
+*.tif
+*.heic
+*.orf
+*.cr2
+*.nef
+*.arw
+*.rw2
+*.dng
+*.raw
+
+# Generated files
+.thumbcache/
+duplicates/
+previous_sessions/
+.gallery_session/
+.hash_index.json
+*.gallery.json
+
+# Config (user-specific, written by firstrun.sh)
+.gallery-config
+
+# Legacy photos directory (pre-gallery setup)
+photos/
+
+# Windows alternate data streams (WSL2 artefacts)
+*:Zone.Identifier
+*:mshield
+*.Zone.Identifier
+
+# Old project files
+REPORT.md
+
+# Logs
+*.log
+
+# Zip sessions
+photos-*.zip

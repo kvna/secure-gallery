@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gallery Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0f0f0f;
+    --surface:  #181818;
+    --surface2: #222;
+    --border:   #2a2a2a;
+    --border2:  #333;
+    --text:     #e8e8e8;
+    --text2:    #888;
+    --accent:   #c8a97e;
+    --accent2:  #8ba4c8;
+    --green:    #4caf7d;
+    --red:      #c85a5a;
+    --font-sans:  'DM Sans', system-ui, sans-serif;
+    --font-mono:  'DM Mono', monospace;
+    --font-serif: 'Playfair Display', serif;
+    --radius: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-weight: 300;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 40px;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  h1 {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: 0.01em;
+  }
+  .header-sub {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text2);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 22px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--border2); }
+  .card.running { border-color: #253525; }
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border2);
+    margin-top: 7px;
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .running .status-dot {
+    background: var(--green);
+    box-shadow: 0 0 7px var(--green);
+  }
+  .card-name {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .card-slug {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    color: var(--text2);
+    letter-spacing: 0.1em;
+    margin-top: 3px;
+  }
+  .vault-badge {
+    font-size: 0.58rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    color: var(--accent2);
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+  .card-desc {
+    font-size: 0.78rem;
+    color: var(--text2);
+    line-height: 1.55;
+    min-height: 1.2rem;
+  }
+  .card-stats {
+    display: flex;
+    gap: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .stat-val {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 1px;
+  }
+  .card-actions {
+    display: flex;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .btn {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: none;
+    color: var(--text2);
+    transition: all 0.15s;
+    text-decoration: none;
+    text-align: center;
+    display: block;
+    user-select: none;
+  }
+  .btn-open {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border2);
+  }
+  .btn-open:hover { background: var(--accent); color: #111; border-color: var(--accent); }
+  .btn-open.disabled { opacity: 0.28; pointer-events: none; }
+  .btn-start { border-color: #253525; color: var(--green); }
+  .btn-start:hover { background: #182818; border-color: var(--green); }
+  .btn-stop  { border-color: #3a2020; color: var(--red); }
+  .btn-stop:hover  { background: #2a1515; border-color: var(--red); }
+  .btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+  .empty {
+    max-width: 1100px;
+    margin: 80px auto;
+    text-align: center;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    line-height: 2.2;
+  }
+  .empty code {
+    color: var(--accent);
+    background: var(--surface);
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  .loading {
+    text-align: center;
+    padding: 80px;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+  }
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(70px);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    padding: 10px 22px;
+    border-radius: 4px;
+    letter-spacing: 0.07em;
+    transition: transform 0.22s ease;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Gallery Hub</h1>
+    <div class="header-sub">localhost:8764</div>
+  </div>
+</header>
+
+<div id="root"><div class="loading">scanning galleries…</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+  let galleries = [];
+
+  async function load() {
+    try {
+      const res = await fetch('/api/galleries');
+      galleries = await res.json();
+      render();
+    } catch(e) {
+      document.getElementById('root').innerHTML =
+        '<div class="loading">could not connect to hub server</div>';
+    }
+  }
+
+  function render() {
+    const root = document.getElementById('root');
+    if (galleries.length === 0) {
+      root.innerHTML = `<div class="empty">
+        No galleries found in <code>~/ns/galleries/</code><br>
+        Create one: <code>~/new-gallery.sh &lt;name&gt;</code>
+      </div>`;
+      return;
+    }
+    root.innerHTML = `<div class="grid">${galleries.map(renderCard).join('')}</div>`;
+  }
+
+  function renderCard(g) {
+    const cls      = g.running ? ' running' : '';
+    const openCls  = g.running ? '' : ' disabled';
+    const nameHtml = esc(g.name);
+    const slugHtml = g.slug !== g.name
+      ? `<div class="card-slug">${esc(g.slug)}</div>` : '';
+    const vaultHtml = g.vault ? `<div class="vault-badge">⬡ encrypted vault</div>` : '';
+    const descHtml = g.description
+      ? `<div class="card-desc">${esc(g.description)}</div>` : '';
+    const statusLabel = g.running
+      ? `<span style="color:var(--green)">running</span>`
+      : `<span>stopped</span>`;
+    const actionBtn = g.running
+      ? `<button class="btn btn-stop"  onclick="stopGallery('${esc(g.slug)}',${g.port},this)">Stop</button>`
+      : `<button class="btn btn-start" onclick="startGallery('${esc(g.slug)}',this)">Start</button>`;
+
+    return `<div class="card${cls}" id="card-${esc(g.slug)}">
+  <div class="card-head">
+    <div class="status-dot"></div>
+    <div>
+      <div class="card-name">${nameHtml}</div>
+      ${slugHtml}
+      ${vaultHtml}
+    </div>
+  </div>
+  ${descHtml}
+  <div class="card-stats">
+    <div><span class="stat-val">${g.image_count}</span>images</div>
+    <div><span class="stat-val">${statusLabel}</span>port ${g.port}</div>
+  </div>
+  <div class="card-actions">
+    <a class="btn btn-open${openCls}" href="http://localhost:${g.port}" target="_blank">Open</a>
+    ${actionBtn}
+  </div>
+</div>`;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function startGallery(slug, btn) {
+    btn.disabled = true;
+    btn.textContent = 'starting…';
+    try {
+      const res  = await fetch('/api/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slug}),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`Starting ${slug}…`);
+        setTimeout(load, 3000);
+      } else {
+        showToast(`Error: ${data.error}`);
+        btn.disabled = false;
+        btn.textContent = 'Start';
+      }
+    } catch(e) {
+      showToast('Failed to reach hub');
+      btn.disabled = false;
+      btn.textContent = 'Start';
+    }
+  }
+
+  async function stopGallery(slug, port, btn) {
+    if (!confirm(`Stop gallery "${slug}" on port ${port}?`)) return;
+    btn.disabled = true;
+    btn.textContent = 'stopping…';
+    try {
+      const res  = await fetch('/api/stop', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({port}),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`Stopped ${slug}`);
+        setTimeout(load, 1500);
+      } else {
+        showToast(`Error: ${data.error}`);
+        btn.disabled = false;
+        btn.textContent = 'Stop';
+      }
+    } catch(e) {
+      showToast('Failed to reach hub');
+      btn.disabled = false;
+      btn.textContent = 'Stop';
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  load();
+  setInterval(load, 10000);  // refresh every 10s
+</script>
+</body>
+</html>

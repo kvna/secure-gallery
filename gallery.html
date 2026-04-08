@@ -1,0 +1,4238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --border: #2a2a2e;
+    --border2: #333338;
+    --text: #e8e6e1;
+    --text-dim: #888880;
+    --text-muted: #555550;
+    --accent: #d4a853;
+    --accent2: #a07830;
+    --tag-bg: #1a1a1c;
+    --panel-w: 360px;
+    --header-h: 60px;
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-mono: 'DM Mono', 'Courier New', monospace;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--header-h);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 24px;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+
+  .logo {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .header-count {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .header-sep { flex: 1; }
+
+  .view-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px;
+  }
+
+  .view-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+    transition: all 0.15s;
+  }
+
+  .view-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border2);
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+
+  .search-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    padding: 6px 12px 6px 30px;
+    width: 180px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--border2); }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    pointer-events: none;
+  }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: flex;
+    height: 100vh;
+    padding-top: var(--header-h);
+  }
+
+  /* GALLERY */
+  .gallery-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: width 0.3s ease;
+  }
+
+  .gallery-wrap::-webkit-scrollbar { width: 4px; }
+  .gallery-wrap::-webkit-scrollbar-track { background: transparent; }
+  .gallery-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .gallery-inner {
+    padding: 24px;
+  }
+
+  /* GRID VIEW */
+  .grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 3px;
+  }
+
+  .photo-card {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--surface);
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .photo-card:hover { border-color: var(--border2); }
+  .photo-card.kb-focus { border-color: var(--accent) !important; border-width: 2px; }
+
+  .photo-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease, filter 0.2s;
+  }
+
+  .photo-card:hover img { transform: scale(1.04); filter: brightness(1.05); }
+
+  .photo-card .overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    padding: 20px 10px 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .photo-card:hover .overlay { opacity: 1; }
+
+  .photo-card .fn {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .photo-card .loading-thumb {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+  }
+
+  /* STRIP VIEW */
+  .strip-view {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .strip-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .strip-card:hover { background: var(--surface2); border-color: var(--border); }
+  .strip-card.kb-focus { background: var(--surface2); border-color: var(--accent); }
+
+  .strip-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+
+  .strip-info { flex: 1; min-width: 0; }
+
+  .strip-name {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+  }
+
+  .strip-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* CONTEXT MENU */
+  .ctx-menu {
+    display: none;
+    position: fixed;
+    z-index: 500;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 180px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+    animation: ctxIn 0.12s ease;
+  }
+  @keyframes ctxIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .ctx-menu.visible { display: block; }
+  .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text);
+    font-family: var(--font-sans);
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .ctx-item:hover { background: var(--border); }
+  .ctx-icon { font-size: 0.9rem; width: 18px; text-align: center; flex-shrink: 0; }
+  .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* METADATA MODAL */
+  .meta-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 600;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 16px;
+  }
+  .meta-modal-overlay.open { display: flex; }
+  .meta-modal {
+    width: var(--panel-w);
+    max-height: calc(100vh - 32px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+    animation: modalIn 0.2s ease;
+    overflow: hidden;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .meta-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .meta-modal-title {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    flex: 1;
+  }
+  .meta-modal-close {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    transition: color 0.15s;
+  }
+  .meta-modal-close:hover { color: var(--text); border-color: var(--border2); }
+  .meta-modal-body { overflow-y: auto; flex: 1; }
+  .meta-modal-body::-webkit-scrollbar { width: 3px; }
+  .meta-modal-body::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  /* PREVIEW */
+  .preview-area {
+    position: relative;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+  }
+
+  .preview-area img {
+    max-width: 100%;
+    max-height: 320px;
+    display: block;
+    object-fit: contain;
+  }
+
+  .preview-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    transition: color 0.2s;
+  }
+
+  .preview-close:hover { color: var(--text); }
+
+  /* FILENAME HEADER */
+  .meta-filename {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meta-filename h3 {
+    font-family: var(--font-serif);
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+
+  .meta-filename .dims {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+  }
+
+  /* SECTION */
+  .meta-section {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .meta-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .meta-section-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .meta-section-count {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    background: var(--tag-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .section-chevron {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    transition: transform 0.2s;
+  }
+
+  .meta-section.collapsed .section-chevron { transform: rotate(-90deg); }
+  .meta-section.collapsed .meta-rows { display: none; }
+
+  .meta-rows { padding: 0 0 10px; }
+
+  .meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 16px;
+    transition: background 0.1s;
+  }
+
+  .meta-row:hover { background: var(--surface2); }
+
+  .meta-key {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta-val {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  .meta-val a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .meta-val a:hover { text-decoration: underline; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    gap: 16px;
+    color: var(--text-muted);
+  }
+
+  .empty-icon { font-size: 3rem; opacity: 0.3; }
+
+  .empty-state h2 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 1.2rem;
+    color: var(--text-dim);
+  }
+
+  .empty-state p {
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.6;
+  }
+
+  /* PANEL EMPTY */
+  .panel-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--text-muted);
+    padding: 32px;
+    text-align: center;
+  }
+
+  .panel-empty-icon { font-size: 2.5rem; opacity: 0.2; }
+
+  .panel-empty p {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1.6;
+  }
+
+  /* LIGHTBOX */
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox.open { display: flex; }
+
+  .lightbox img {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    background: none;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 8px 16px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    border-radius: 4px;
+    transition: color 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .lightbox-close:hover { color: var(--text); }
+
+  .lightbox-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 16px 12px;
+    font-size: 1rem;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .lightbox-nav:hover { color: var(--text); background: rgba(0,0,0,0.8); }
+  .lightbox-nav.prev { left: 20px; }
+  .lightbox-nav.next { right: 20px; }
+
+  /* LOADER */
+  .loader {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOOLTIP */
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    border-radius: 3px;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+
+  .copy-btn:hover { color: var(--text); border-color: var(--border2); }
+
+  .status-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 5px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    z-index: 50;
+  }
+
+  .status-dot { width: 5px; height: 5px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+
+  /* Animations */
+  .photo-card { animation: fadeIn 0.3s ease backwards; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @media (max-width: 700px) {
+    .grid-view { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .meta-modal { width: calc(100vw - 32px); }
+  }
+
+  /* ── TAG MODAL ──────────────────────────────────────────── */
+  .tag-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 700;
+    align-items: center;
+    justify-content: center;
+  }
+  .tag-modal-overlay.open { display: flex; }
+
+  .tag-modal {
+    width: 480px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+    animation: modalIn 0.2s ease;
+    overflow: hidden;
+  }
+
+  .tag-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .tag-modal-title {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 400;
+  }
+
+  #tagModalFilename {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+
+  .tag-modal-body {
+    padding: 18px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .tag-field { display: flex; flex-direction: column; gap: 6px; }
+
+  .tag-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .tag-input {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .tag-input:focus { border-color: var(--accent2); }
+
+  .tag-textarea {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    outline: none;
+    resize: vertical;
+    width: 100%;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+  .tag-textarea:focus { border-color: var(--accent2); }
+
+  /* Chips */
+  .tag-chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 6px 8px;
+    min-height: 40px;
+    cursor: text;
+    transition: border-color 0.2s;
+  }
+  .tag-chips-wrap:focus-within { border-color: var(--accent2); }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 2px 8px 2px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text);
+    white-space: nowrap;
+    animation: chipIn 0.12s ease;
+  }
+  @keyframes chipIn {
+    from { opacity: 0; transform: scale(0.85); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .tag-chip-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .tag-chip-remove:hover { color: var(--text); }
+
+  .tag-chip-input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    min-width: 140px;
+    flex: 1;
+    padding: 2px 4px;
+  }
+  .tag-chip-input::placeholder { color: var(--text-muted); }
+
+  .tag-hint {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    color: var(--text-muted);
+  }
+  .tag-hint kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+  }
+
+  /* Suggestions */
+  .tag-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag-suggestion-chip {
+    background: var(--surface2);
+    border: 1px dashed var(--border2);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .tag-suggestion-chip:hover { border-color: var(--accent2); color: var(--text); }
+
+  /* Actions row */
+  .tag-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+  }
+
+  .tag-save-status {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    min-height: 1em;
+  }
+
+  .tag-btn {
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    padding: 7px 16px;
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .tag-btn:hover { opacity: 0.85; }
+
+  .tag-btn-primary  { background: var(--accent); color: #000; font-weight: 500; }
+  .tag-btn-secondary { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border2); }
+  .tag-btn-export   { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border2); font-size: 0.75rem; }
+
+  /* Tag badge on grid cards */
+  .tag-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(212,168,83,0.9);
+    color: #000;
+    border-radius: 3px;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    padding: 2px 5px;
+    pointer-events: none;
+    letter-spacing: 0.04em;
+  }
+
+
+  /* ── TAG FILTER BAR ──────────────────────────────────────────────────── */
+  :root {
+    --tagbar-h: 44px;
+  }
+
+  .tag-filter-bar {
+    position: fixed;
+    top: var(--header-h);
+    left: 0; right: 0;
+    height: var(--tagbar-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    z-index: 90;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .tag-filter-bar::-webkit-scrollbar { display: none; }
+
+  .tag-filter-bar.empty { display: none; }
+
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 3px 10px 3px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    user-select: none;
+  }
+  .filter-chip:hover { border-color: var(--border2); color: var(--text); }
+  .filter-chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .filter-chip-cat {
+    border-style: solid;
+  }
+  .filter-chip-kw {
+    border-style: dashed;
+  }
+
+  .filter-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+    margin: 0 4px;
+  }
+
+  .filter-clear {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    margin-left: auto;
+  }
+  .filter-clear:hover { color: var(--text); }
+
+  /* Shift layout down to account for tag bar when visible */
+  .layout.has-tagbar { padding-top: calc(var(--header-h) + var(--tagbar-h)); }
+
+  /* ── HOVER TAG BOX ───────────────────────────────────────────────────── */
+  .tag-hover-box {
+    position: fixed;
+    top: calc(var(--header-h) + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(14,14,15,0.92);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    z-index: 95;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    pointer-events: none;
+    max-width: 70vw;
+    flex-wrap: wrap;
+    animation: tagBoxIn 0.12s ease;
+  }
+  @keyframes tagBoxIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .tag-hover-box.visible { display: flex; }
+
+  /* shift down if tagbar is showing */
+  .layout.has-tagbar ~ .tag-hover-box,
+  .tag-filter-bar:not(.empty) ~ .tag-hover-box {
+    top: calc(var(--header-h) + var(--tagbar-h) + 6px);
+  }
+
+  .thb-filename {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    flex-shrink: 0;
+  }
+
+  .thb-sep {
+    width: 1px; height: 14px;
+    background: var(--border2);
+    flex-shrink: 0;
+  }
+
+  .thb-cat {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .thb-kw {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .thb-notes {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+
+  .thb-empty {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+
+  /* ── RENAME MODAL ────────────────────────────────────────────────────── */
+  .rename-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 700;
+    align-items: center;
+    justify-content: center;
+  }
+  .rename-modal-overlay.open { display: flex; }
+
+  .rename-modal {
+    width: 460px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+    animation: modalIn 0.2s ease;
+    overflow: hidden;
+  }
+
+  .rename-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .rename-modal-title {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 400;
+    flex: 1;
+  }
+
+  .rename-modal-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .rename-current {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .rename-current-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .rename-current-name {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    word-break: break-all;
+  }
+
+  .rename-field { display: flex; flex-direction: column; gap: 6px; }
+
+  .rename-input-row {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .rename-input-row:focus-within { border-color: var(--accent2); }
+
+  .rename-input-row .tag-input {
+    border: none;
+    border-radius: 0;
+    flex: 1;
+    background: transparent;
+  }
+  .rename-input-row .tag-input:focus { border: none; }
+
+  .rename-ext {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 0 12px 0 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .rename-auto-section {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rename-auto-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .rename-auto-preview {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    flex: 1;
+    word-break: break-all;
+    line-height: 1.4;
+  }
+
+  .rename-use-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .rename-use-btn:hover { color: var(--text); border-color: var(--accent2); }
+
+  .rename-auto-hint {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+  }
+
+  .rename-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+
+  .rename-status {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    min-height: 1em;
+  }
+
+
+  /* ── SESSION PILL + LOGOUT ───────────────────────────────────────────── */
+  .session-pill {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    display: none;
+  }
+  .session-pill.zip  { border-color: var(--accent2); color: var(--accent); }
+  .session-pill.folder { border-color: var(--border2); }
+
+  .logout-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .logout-btn:hover { border-color: #c0392b; color: #e74c3c; background: rgba(231,76,60,0.08); }
+  .logout-icon { font-size: 0.9rem; }
+
+  /* Logout modal */
+  .logout-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 900;
+    align-items: center;
+    justify-content: center;
+  }
+  .logout-modal-overlay.open { display: flex; }
+
+  .logout-modal {
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 32px 28px 24px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.8);
+    animation: modalIn 0.2s ease;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logout-modal-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .logout-modal-title {
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .logout-modal-desc {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 280px;
+  }
+
+  .logout-progress {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 4px 0;
+  }
+
+  .logout-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+    animation: progressPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes progressPulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.6; }
+  }
+
+  .logout-status {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    min-height: 1em;
+    text-align: center;
+  }
+
+  .logout-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+
+  /* ── MULTI-SELECT ────────────────────────────────────────────────────── */
+  .photo-card.ms-selected {
+    border-color: var(--accent) !important;
+    border-width: 2px;
+  }
+  .photo-card.ms-selected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(212, 168, 83, 0.12);
+    pointer-events: none;
+  }
+  .strip-card.ms-selected {
+    background: rgba(212, 168, 83, 0.08);
+    border-color: var(--accent);
+  }
+
+  /* Checkbox tick in corner */
+  .ms-check {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    width: 18px;
+    height: 18px;
+    background: var(--accent);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #000;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 2;
+    animation: checkIn 0.1s ease;
+  }
+  @keyframes checkIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  /* Selection bar that appears at bottom when images are selected */
+  .multi-bar {
+    position: fixed;
+    bottom: 26px;   /* above status bar */
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--accent2);
+    border-radius: 10px;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap;
+  }
+  .multi-bar.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+  .multi-bar-count {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    font-weight: 500;
+    min-width: 90px;
+  }
+  .multi-bar-sep {
+    width: 1px; height: 18px;
+    background: var(--border2);
+  }
+  .multi-bar-btn {
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    padding: 5px 12px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .multi-bar-btn:hover { color: var(--text); border-color: var(--border2); }
+  .multi-bar-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+  .multi-bar-btn.primary:hover { opacity: 0.85; }
+  .multi-bar-hint {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+  }
+
+  /* Ctrl-mode cursor — distinct from normal kb-focus */
+  .photo-card.ms-cursor  { outline: 2px dashed var(--accent2); outline-offset: -2px; }
+  .strip-card.ms-cursor  { outline: 2px dashed var(--accent2); outline-offset: -2px; }
+
+
+  /* ── REFRESH BUTTON ──────────────────────────────────────────────────── */
+  .refresh-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 5px 9px;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s, transform 0.3s;
+    flex-shrink: 0;
+  }
+  .refresh-btn:hover { color: var(--text); border-color: var(--border2); }
+  .refresh-btn.spinning { animation: spinOnce 0.5s ease; }
+  @keyframes spinOnce { to { transform: rotate(360deg); } }
+
+  /* New-images toast */
+  .new-images-toast {
+    position: fixed;
+    top: calc(var(--header-h) + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--surface2);
+    border: 1px solid var(--accent2);
+    border-radius: 8px;
+    padding: 9px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text);
+    z-index: 300;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .new-images-toast.visible {
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast-accent { color: var(--accent); font-weight: 500; }
+
+
+  /* ── NEW-FILE MARKERS ───────────────────────────────────────────────── */
+  .filter-chip-new {
+    background: rgba(212,168,83,0.15);
+    border: 1px solid var(--accent2);
+    color: var(--accent);
+  }
+  .filter-chip-new.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  .new-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: var(--accent);
+    color: #000;
+    border-radius: 3px;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 2px 5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 3;
+    animation: newBadgeIn 0.3s ease;
+  }
+  @keyframes newBadgeIn {
+    from { opacity: 0; transform: scale(0.6) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+
+  /* ── DUPLICATE LOG ───────────────────────────────────────────────────── */
+  .dup-btn {
+    position: relative;
+  }
+  .dup-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e05;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 0.5rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 1px 4px;
+    min-width: 14px;
+    text-align: center;
+    line-height: 1.4;
+    pointer-events: none;
+    display: none;
+  }
+  .dup-badge.visible { display: block; }
+
+  .dup-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.65rem;
+  }
+  .dup-row:hover { background: var(--surface2); }
+  .dup-cell {
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dup-reason {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    padding: 2px 12px 6px;
+    grid-column: 1 / -1;
+    font-family: var(--font-sans);
+  }
+  .dup-header-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border2);
+    font-size: 0.58rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+
+  /* ── DUPLICATES PANEL ───────────────────────────────────────────────── */
+  .dup-indicator {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(231,76,60,0.12);
+    border: 1px solid rgba(231,76,60,0.4);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: #e74c3c;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .dup-indicator:hover { background: rgba(231,76,60,0.2); }
+  .dup-indicator.visible { display: flex; }
+
+  .dup-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.68rem;
+  }
+  .dup-row:hover { background: var(--surface2); }
+  .dup-moved   { font-family: var(--font-mono); color: #e74c3c; word-break: break-all; }
+  .dup-kept    { font-family: var(--font-mono); color: var(--text-dim); word-break: break-all; }
+  .dup-reason  { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted);
+                 white-space: nowrap; }
+  .dup-time    { font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-muted); }
+
+
+  /* ── DUP REVIEW ROWS ─────────────────────────────────────────────────── */
+  .dup-review-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .dup-review-row:hover { background: var(--surface2); }
+  .dup-review-row.restored { opacity: 0.45; }
+  .dup-review-row.deleted  { opacity: 0.3; text-decoration: line-through; }
+
+  .dup-thumb-pair {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .dup-thumb-wrap {
+    position: relative;
+    width: 64px;
+    flex-shrink: 0;
+  }
+  .dup-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+    background: var(--surface2);
+  }
+  .dup-thumb-label {
+    position: absolute;
+    bottom: 2px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 0.45rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    text-transform: uppercase;
+  }
+  .dup-thumb-label.kept   { color: #2ecc71; }
+  .dup-thumb-label.moved  { color: #e74c3c; }
+
+  .dup-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .dup-name {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dup-meta {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .dup-type-badge {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.06em;
+  }
+  .dup-type-exact   { background: rgba(231,76,60,0.2);  color: #e74c3c; }
+  .dup-type-visual  { background: rgba(230,126,34,0.2); color: #e67e22; }
+
+  .dup-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .dup-action-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    padding: 4px 8px;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .dup-action-btn:hover { color: var(--text); border-color: var(--border2); }
+  .dup-action-btn.restore:hover { color: #2ecc71; border-color: #2ecc71; }
+  .dup-action-btn.delete:hover  { color: #e74c3c; border-color: #e74c3c; }
+  .dup-action-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .dup-ondisk-header {
+    padding: 8px 14px 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+
+  /* ── LIGHTBOX FILTERS ────────────────────────────────────────────────── */
+  .lightbox-filter-hud {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90vw;
+    gap: 6px;
+    z-index: 1010;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .lightbox.open .lightbox-filter-hud { pointer-events: auto; }
+  .lightbox-filter-hud.visible { opacity: 1; }
+
+  .filter-key {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .filter-key:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.3); }
+  .filter-key.active {
+    color: var(--accent);
+    border-color: var(--accent2);
+    background: rgba(212,168,83,0.12);
+  }
+  .filter-key kbd {
+    background: rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+  }
+
+  /* The actual CSS filter classes applied to the image */
+  #lightboxImg.filter-original  { filter: none; }
+  #lightboxImg.filter-highkey   {
+    filter: grayscale(1) brightness(1.35) contrast(0.75);
+  }
+  #lightboxImg.filter-midtone   {
+    filter: grayscale(1) brightness(1.0) contrast(1.05);
+  }
+  #lightboxImg.filter-lowkey    {
+    filter: grayscale(1) brightness(0.65) contrast(1.45);
+  }
+  #lightboxImg.filter-sepia     {
+    filter: sepia(1) brightness(1.05) contrast(0.9);
+  }
+  #lightboxImg.filter-vivid     {
+    filter: contrast(1.35) saturate(1.4);
+  }
+  #lightboxImg.filter-faded     {
+    filter: contrast(0.8) brightness(1.12) saturate(0.75);
+  }
+  #lightboxImg.filter-warm      {
+    filter: saturate(1.2) hue-rotate(-20deg) brightness(1.05);
+  }
+  #lightboxImg.filter-cool      {
+    filter: saturate(0.9) hue-rotate(20deg) brightness(1.05);
+  }
+  #lightboxImg.filter-negative  {
+    filter: invert(1);
+  }
+
+
+  /* ── DELETE BUTTON ───────────────────────────────────────────────────── */
+  .lightbox-delete {
+    position: fixed;
+    top: 20px;
+    right: 110px;
+    background: none;
+    border: 1px solid rgba(231,76,60,0.4);
+    color: rgba(231,76,60,0.7);
+    cursor: pointer;
+    padding: 7px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    border-radius: 4px;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    letter-spacing: 0.05em;
+    z-index: 1010;
+  }
+  .lightbox-delete:hover {
+    color: #e74c3c;
+    border-color: #e74c3c;
+    background: rgba(231,76,60,0.1);
+  }
+
+  .ctx-item-danger { color: #e74c3c !important; }
+  .ctx-item-danger:hover { background: rgba(231,76,60,0.12) !important; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    Gallery
+  </div>
+  <span class="header-count" id="headerCount">— images</span>
+  <div class="header-sep"></div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input class="search-input" type="text" id="searchInput" placeholder="Filter by name…">
+  </div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="btnGrid" onclick="setView('grid')">Grid</button>
+    <button class="view-btn" id="btnStrip" onclick="setView('strip')">List</button>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()" title="Refresh image list (R)">↻</button>
+  <button class="refresh-btn" id="renameAllBtn" onclick="renameAll()" title="Rename all images to image-DATE-TIME format now" style="font-size:0.6rem;padding:5px 8px;font-family:var(--font-mono);letter-spacing:0.04em">rename</button>
+  <button class="refresh-btn" id="debugBtn" onclick="openDebugPanel()" title="Scan report — see what the server finds" style="font-size:0.6rem;padding:5px 8px;letter-spacing:0.05em;font-family:var(--font-mono)">debug</button>
+  <button class="refresh-btn dup-btn" id="dupBtn" onclick="openDupPanel()" title="Duplicate log" style="font-size:0.6rem;padding:5px 8px;letter-spacing:0.05em;font-family:var(--font-mono)">dupes<span class="dup-badge" id="dupBadge"></span></button>
+  <div class="dup-indicator" id="dupIndicator" onclick="openDupPanel()" title="Duplicates found — click to review">
+    🗂 <span id="dupCount">0</span> duplicate(s) moved
+  </div>
+  <div class="session-pill" id="sessionPill" title="Session info"></div>
+  <button class="logout-btn" id="logoutBtn" onclick="initiateLogout()" title="Zip session and exit">
+    <span class="logout-icon">⏏</span> End Session
+  </button>
+</header>
+
+<!-- Tag filter bar -->
+<div class="tag-filter-bar empty" id="tagFilterBar">
+  <span class="filter-label">Filter</span>
+</div>
+
+<!-- Hover / focus tag box -->
+<div class="tag-hover-box" id="tagHoverBox"></div>
+
+<div class="layout" id="mainLayout">
+  <div class="gallery-wrap" id="galleryWrap">
+    <div class="gallery-inner" id="galleryInner">
+      <div class="empty-state">
+        <div class="loader"></div>
+        <p>Loading images…</p>
+      </div>
+    </div>
+  </div>
+</div> <!-- /layout -->
+
+<!-- Multi-select action bar -->
+<div class="multi-bar" id="multiBar">
+  <span class="multi-bar-count" id="multiBarCount">0 selected</span>
+  <div class="multi-bar-sep"></div>
+  <span class="multi-bar-hint">Space = toggle · Enter = tag · Esc = clear</span>
+  <div class="multi-bar-sep"></div>
+  <button class="multi-bar-btn" onclick="clearMultiSelect()">✕ Clear</button>
+  <button class="multi-bar-btn primary" onclick="openMultiTagModal()">🏷 Tag Selected</button>
+</div>
+
+<div class="status-bar" id="statusBar">
+  <span class="status-dot"></span>
+  <span id="statusText">Ready</span>
+</div>
+
+<!-- New images toast -->
+<div class="new-images-toast" id="newImageToast" onclick="refreshImages()">
+  <span>📷</span>
+  <span><span class="toast-accent" id="toastCount"></span> new image(s) detected</span>
+  <span style="color:var(--text-muted)">— click to reload</span>
+</div>
+
+<!-- Custom context menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" id="ctxView"><span class="ctx-icon">⛶</span> View Full Size</div>
+  <div class="ctx-item" id="ctxMeta"><span class="ctx-icon">◈</span> Show Metadata</div>
+  <div class="ctx-item" id="ctxTag"><span class="ctx-icon">🏷</span> Tag / Categorise</div>
+  <div class="ctx-item" id="ctxRename"><span class="ctx-icon">✎</span> Rename</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item ctx-item-danger" id="ctxDelete"><span class="ctx-icon">🗑</span> Delete</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctxNav"><span class="ctx-icon">↗</span> Open in New Tab</div>
+</div>
+
+<!-- Tag modal -->
+<div class="tag-modal-overlay" id="tagModalOverlay" onclick="closeTagModal(event)">
+  <div class="tag-modal">
+    <div class="tag-modal-header">
+      <span class="tag-modal-title">🏷 Tag Image</span>
+      <span id="tagModalFilename"></span>
+      <button class="meta-modal-close" onclick="closeTagModal()">✕</button>
+    </div>
+    <div class="tag-modal-body">
+      <div class="tag-field">
+        <label class="tag-label">Category</label>
+        <input type="text" id="tagCategory" class="tag-input" placeholder="e.g. Holiday, Family, Architecture…">
+      </div>
+      <div class="tag-field">
+        <label class="tag-label">Keywords</label>
+        <div class="tag-chips-wrap" id="tagChipsWrap" onclick="document.getElementById('tagKeywordInput').focus()">
+          <input type="text" id="tagKeywordInput" class="tag-chip-input" placeholder="Type keyword and press Enter or comma…">
+        </div>
+        <div class="tag-hint">Press <kbd>Enter</kbd> or <kbd>,</kbd> to add · <kbd>Backspace</kbd> to remove last</div>
+      </div>
+      <div class="tag-field">
+        <label class="tag-label">Notes</label>
+        <textarea id="tagNotes" class="tag-textarea" placeholder="Any notes about this image…" rows="3"></textarea>
+      </div>
+      <div class="tag-existing" id="tagExistingWrap" style="display:none">
+        <label class="tag-label">Suggested (from other images)</label>
+        <div class="tag-suggestions" id="tagSuggestions"></div>
+      </div>
+      <div class="tag-actions">
+        <div class="tag-save-status" id="tagSaveStatus"></div>
+        <button class="tag-btn tag-btn-secondary" onclick="closeTagModal()">Cancel</button>
+        <button class="tag-btn tag-btn-export" id="tagExportBtn" onclick="exportTagsToExif()" title="Write keywords into the image EXIF permanently (JPEG only)">⬇ Bake to EXIF</button>
+        <button class="tag-btn tag-btn-primary" onclick="saveTags()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Metadata modal -->
+<div class="meta-modal-overlay" id="metaModalOverlay" onclick="closeMetaModal(event)">
+  <div class="meta-modal">
+    <div class="meta-modal-header">
+      <span class="meta-modal-title">Metadata</span>
+      <span id="metaModalFilename" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;"></span>
+      <button class="meta-modal-close" onclick="document.getElementById('metaModalOverlay').classList.remove('open')">✕ Close</button>
+    </div>
+    <div class="meta-modal-body" id="metaModalBody">
+      <div class="panel-empty"><div class="loader"></div><p>Loading…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rename modal -->
+<div class="rename-modal-overlay" id="renameModalOverlay" onclick="closeRenameModal(event)">
+  <div class="rename-modal">
+    <div class="rename-modal-header">
+      <span class="rename-modal-title">✎ Rename Image</span>
+      <button class="meta-modal-close" onclick="closeRenameModal()">✕</button>
+    </div>
+    <div class="rename-modal-body">
+      <div class="rename-current">
+        <span class="rename-current-label">Current name</span>
+        <span class="rename-current-name" id="renameCurrentName"></span>
+      </div>
+
+      <div class="rename-field">
+        <label class="tag-label">New name <span style="color:var(--text-muted);font-weight:300">(without extension)</span></label>
+        <div class="rename-input-row">
+          <input type="text" id="renameInput" class="tag-input" placeholder="Enter new filename…" spellcheck="false">
+          <span class="rename-ext" id="renameExt"></span>
+        </div>
+      </div>
+
+      <div class="rename-auto-section">
+        <label class="tag-label">Auto-rename suggestion</label>
+        <div class="rename-auto-row">
+          <span class="rename-auto-preview" id="renameAutoPreview">Loading…</span>
+          <button class="rename-use-btn" id="renameUseBtn" onclick="useAutoSuggestion()">Use this</button>
+        </div>
+        <div class="rename-auto-hint">Based on EXIF date + camera model</div>
+      </div>
+
+      <div class="rename-actions">
+        <div class="rename-status" id="renameStatus"></div>
+        <button class="tag-btn tag-btn-secondary" onclick="closeRenameModal()">Cancel</button>
+        <button class="tag-btn tag-btn-primary" onclick="doRename()">Rename</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Logout modal -->
+<div class="logout-modal-overlay" id="logoutModalOverlay">
+  <div class="logout-modal">
+    <div class="logout-modal-icon">⏏</div>
+    <h2 class="logout-modal-title">End Session</h2>
+    <p class="logout-modal-desc" id="logoutDesc">
+      All images will be zipped and saved. The server will stop.
+    </p>
+    <div class="logout-progress" id="logoutProgress" style="display:none">
+      <div class="logout-progress-bar" id="logoutProgressBar"></div>
+    </div>
+    <div class="logout-status" id="logoutStatus"></div>
+    <div class="logout-actions" id="logoutActions">
+      <button class="tag-btn tag-btn-secondary" onclick="closeLogoutModal()">Cancel</button>
+      <button class="tag-btn tag-btn-primary" id="logoutConfirmBtn" onclick="confirmLogout()">
+        Zip &amp; Exit
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Debug scan modal -->
+<div class="meta-modal-overlay" id="debugModalOverlay" onclick="closeDebugModal(event)">
+  <div class="meta-modal" style="width:600px;max-width:95vw">
+    <div class="meta-modal-header">
+      <span class="meta-modal-title" style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.08em">SCAN REPORT</span>
+      <span id="debugSummary" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);flex:1;padding:0 12px"></span>
+      <button class="meta-modal-close" onclick="closeDebugModal()">✕ Close</button>
+    </div>
+    <div class="meta-modal-body" id="debugBody" style="padding:0;font-family:var(--font-mono);font-size:0.68rem">
+      <div class="panel-empty"><div class="loader"></div><p>Scanning…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicates review modal -->
+<div class="meta-modal-overlay" id="dupModalOverlay" onclick="closeDupModal(event)">
+  <div class="meta-modal" style="width:720px;max-width:96vw">
+    <div class="meta-modal-header">
+      <span class="meta-modal-title" style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.08em">🗂 DUPLICATES</span>
+      <span id="dupModalSummary" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);flex:1;padding:0 12px"></span>
+      <button class="tag-btn tag-btn-secondary" style="font-size:0.68rem;padding:4px 10px;margin-right:6px" onclick="clearDupLog()">Clear log</button>
+      <button class="meta-modal-close" onclick="closeDupModal()">✕ Close</button>
+    </div>
+    <div style="padding:7px 16px;background:var(--surface2);border-bottom:1px solid var(--border);
+                font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);line-height:1.6">
+      Duplicates are moved to <strong style="color:var(--accent)">duplicates/</strong> — not deleted.
+      SHA-256 = byte-identical · pHash = visually identical · Restore or delete from here.
+    </div>
+    <div class="meta-modal-body" id="dupBody" style="max-height:65vh;overflow-y:auto">
+      <div class="panel-empty"><p style="color:var(--text-muted)">No duplicates found yet</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">ESC  ✕</button>
+  <button class="lightbox-delete" onclick="deleteCurrentImage()" title="Delete image (Del key)">🗑 Delete</button>
+  <button class="lightbox-nav prev" onclick="lightboxNav(-1)">‹</button>
+  <img id="lightboxImg" src="" alt="" class="filter-original">
+  <button class="lightbox-nav next" onclick="lightboxNav(1)">›</button>
+
+  <!-- Filter HUD -->
+  <div class="lightbox-filter-hud" id="filterHud">
+    <div class="filter-key active" id="fk1" onclick="setLightboxFilter(1)">
+      <kbd>1</kbd> Original
+    </div>
+    <div class="filter-key" id="fk2" onclick="setLightboxFilter(2)">
+      <kbd>2</kbd> High Key
+    </div>
+    <div class="filter-key" id="fk3" onclick="setLightboxFilter(3)">
+      <kbd>3</kbd> Mid Tone
+    </div>
+    <div class="filter-key" id="fk4" onclick="setLightboxFilter(4)">
+      <kbd>4</kbd> Low Key
+    </div>
+    <div class="filter-key" id="fk5" onclick="setLightboxFilter(5)">
+      <kbd>5</kbd> Sepia
+    </div>
+    <div class="filter-key" id="fk6" onclick="setLightboxFilter(6)">
+      <kbd>6</kbd> Vivid
+    </div>
+    <div class="filter-key" id="fk7" onclick="setLightboxFilter(7)">
+      <kbd>7</kbd> Faded
+    </div>
+    <div class="filter-key" id="fk8" onclick="setLightboxFilter(8)">
+      <kbd>8</kbd> Warm
+    </div>
+    <div class="filter-key" id="fk9" onclick="setLightboxFilter(9)">
+      <kbd>9</kbd> Cool
+    </div>
+    <div class="filter-key" id="fk0" onclick="setLightboxFilter(0)">
+      <kbd>0</kbd> Negative
+    </div>
+  </div>
+</div>
+
+<script>
+  let allImages = [];
+  let filteredImages = [];
+  let thumbnails = {}; // cache
+  let currentView = 'grid';
+  let lightboxIndex = -1;
+  let ctxTarget = null; // file name that was right-clicked
+
+  async function init() {
+    try {
+      const res  = await fetch('/api/images');
+      const data = await res.json();
+      allImages      = data.images || [];
+      filteredImages = [...allImages];
+
+      const ready = data.ready !== false;  // undefined = old server = treat as ready
+
+      document.getElementById('headerCount').textContent =
+        `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+
+      if (!ready && allImages.length === 0) {
+        // Watcher is still indexing — show startup message and poll until ready
+        setStatus('⏳ Indexing images… please wait');
+        document.getElementById('galleryInner').innerHTML = `
+          <div class="empty-state">
+            <div class="loader"></div>
+            <h2 style="margin-top:16px">Building index…</h2>
+            <p style="font-family:var(--font-mono);font-size:0.75rem;margin-top:8px">
+              First run: hashing all images for duplicate detection.<br>
+              The gallery will appear automatically when ready.
+            </p>
+          </div>`;
+        _waitingForReady = true;
+        return;   // pollFolderHash will call refreshImages when ready=true
+      }
+
+      setStatus(`${allImages.length} images`);
+      renderGallery();
+      await loadAllTags();
+      await loadNewFiles();
+      try {
+        const wr = await fetch('/api/images/watch');
+        const wd = await wr.json();
+        _lastHash = wd.hash || '';
+      } catch(e) {}
+    } catch (e) {
+      document.getElementById('galleryInner').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">⚠</div>
+          <h2>Cannot connect to server</h2>
+          <p>Make sure server.py is running:<br><code style="color:var(--accent)">python3 server.py</code></p>
+        </div>`;
+    }
+  }
+
+  let _waitingForReady = false;
+
+  function setStatus(msg) {
+    document.getElementById('statusText').textContent = msg;
+  }
+
+  function setView(v) {
+    currentView = v;
+    document.getElementById('btnGrid').classList.toggle('active', v === 'grid');
+    document.getElementById('btnStrip').classList.toggle('active', v === 'strip');
+    renderGallery();
+  }
+
+  function renderGallery() {
+    const inner = document.getElementById('galleryInner');
+    if (filteredImages.length === 0) {
+      inner.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">◻</div>
+        <h2>No images found</h2>
+        <p>Drop images into the photos folder, then refresh.<br>Supported: JPG, PNG, GIF, WebP, BMP, TIFF</p>
+      </div>`;
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.className = currentView === 'grid' ? 'grid-view' : 'strip-view';
+
+    filteredImages.forEach((name, i) => {
+      if (currentView === 'grid') {
+        container.appendChild(makeGridCard(name, i));
+      } else {
+        container.appendChild(makeStripCard(name, i));
+      }
+    });
+
+    inner.innerHTML = '';
+    inner.appendChild(container);
+    galleryCursor = -1; // reset keyboard cursor on re-render
+    clearMultiSelect();  // clear selection on re-render
+    renderTagBadges();   // includes new badges via renderNewBadges()
+
+    // Lazy-load thumbnails — only load what's visible, batch the rest
+    scheduleThumbnails();
+  }
+
+  function makeGridCard(name, i) {
+    const card = document.createElement('div');
+    card.className = 'photo-card';
+    card.style.animationDelay = `${Math.min(i * 20, 400)}ms`;
+    card.dataset.name = name;
+    card.dataset.idx  = i;
+    card.innerHTML = `
+      <div class="loading-thumb" id="lt-${i}"><span class="loader"></span></div>
+      <div class="overlay"><div class="fn">${escHtml(name)}</div></div>`;
+    card.addEventListener('click', e => {
+      if (e.ctrlKey || e.metaKey || multiSelected.size > 0) {
+        // Ctrl+click or already in multi-select mode: toggle selection
+        e.preventDefault();
+        galleryCursor = filteredImages.indexOf(name);
+        toggleMultiSelect(name);
+        applyGalleryCursor();
+      } else {
+        openLightbox(name);
+      }
+    });
+    card.addEventListener('contextmenu', e => showCtxMenu(e, name));
+    return card;
+  }
+
+  function makeStripCard(name, i) {
+    const card = document.createElement('div');
+    card.className = 'strip-card';
+    card.dataset.name = name;
+    card.innerHTML = `
+      <div class="strip-thumb" style="background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:1.2rem" id="st-${i}">⋯</div>
+      <div class="strip-info">
+        <div class="strip-name">${escHtml(name)}</div>
+        <div class="strip-meta" id="sm-${i}">—</div>
+      </div>`;
+    card.addEventListener('click', e => {
+      if (e.ctrlKey || e.metaKey || multiSelected.size > 0) {
+        e.preventDefault();
+        galleryCursor = filteredImages.indexOf(name);
+        toggleMultiSelect(name);
+        applyGalleryCursor();
+      } else {
+        openLightbox(name);
+      }
+    });
+    card.addEventListener('contextmenu', e => showCtxMenu(e, name));
+    return card;
+  }
+
+  // ── THUMBNAIL LOADER ────────────────────────────────────────────────────────
+  // Uses IntersectionObserver to only request thumbnails for visible cards.
+  // Falls back to a concurrency-limited queue (max 4 parallel requests).
+
+  const THUMB_CONCURRENCY = 3;  // matches server semaphore
+  let _thumbQueue   = [];     // [{name, i}] waiting to be fetched
+  let _thumbActive  = 0;      // number of in-flight requests
+  let _thumbObs     = null;   // IntersectionObserver instance
+
+  function scheduleThumbnails() {
+    // Reset progress counters
+    _thumbQueue = []; _thumbTotal = 0; _thumbDone = 0;
+    // Disconnect old observer
+    if (_thumbObs) { _thumbObs.disconnect(); _thumbObs = null; }
+
+    const cards = document.querySelectorAll('.photo-card[data-name]');
+    if (cards.length === 0) return;
+
+    _thumbObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const card = entry.target;
+        const name = card.dataset.name;
+        const i    = parseInt(card.dataset.idx, 10);
+        if (thumbnails[name]) {
+          applyThumb(name, i, thumbnails[name]);
+          _thumbObs.unobserve(card);
+          return;
+        }
+        // Not cached — queue it
+        if (!_thumbQueue.find(q => q.name === name)) {
+          _thumbQueue.push({name, i});
+          _thumbTotal++;
+          _thumbObs.unobserve(card);
+          drainThumbQueue();
+        }
+      });
+    }, { rootMargin: '200px' });   // start loading 200px before entering viewport
+
+    cards.forEach(card => _thumbObs.observe(card));
+  }
+
+  let _thumbTotal   = 0;
+  let _thumbDone    = 0;
+
+  function drainThumbQueue() {
+    // Update status bar with loading progress
+    if (_thumbQueue.length > 0 || _thumbActive > 0) {
+      const remaining = _thumbQueue.length + _thumbActive;
+      setStatus(`Loading thumbnails… ${_thumbDone} / ${_thumbTotal} (${remaining} remaining)`);
+    } else if (_thumbDone > 0) {
+      setStatus(`${filteredImages.length} images`);
+      _thumbDone = 0; _thumbTotal = 0;
+    }
+
+    while (_thumbActive < THUMB_CONCURRENCY && _thumbQueue.length > 0) {
+      const {name, i} = _thumbQueue.shift();
+      _thumbActive++;
+      fetchThumb(name, i).finally(() => {
+        _thumbActive--;
+        _thumbDone++;
+        drainThumbQueue();
+      });
+    }
+  }
+
+  async function fetchThumb(name, i) {
+    if (thumbnails[name]) { applyThumb(name, i, thumbnails[name]); return; }
+    try {
+      const res  = await fetch(`/api/thumbnail?file=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      if (data.thumbnail) {
+        thumbnails[name] = data.thumbnail;
+        applyThumb(name, i, data.thumbnail);
+      }
+    } catch(e) {}
+  }
+
+  // Keep the old name working for any other callers
+  async function loadThumb(name, i) { return fetchThumb(name, i); }
+
+  function applyThumb(name, i, b64) {
+    const src = `data:image/jpeg;base64,${b64}`;
+    // Grid
+    const lt = document.getElementById(`lt-${i}`);
+    if (lt) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = name;
+      lt.replaceWith(img);
+    }
+    // Strip
+    const st = document.getElementById(`st-${i}`);
+    if (st) {
+      const img = document.createElement('img');
+      img.className = 'strip-thumb';
+      img.src = src;
+      img.alt = name;
+      st.replaceWith(img);
+    }
+  }
+
+  // ── CONTEXT MENU ──────────────────────────────────────────
+  function showCtxMenu(e, name) {
+    e.preventDefault();
+    ctxTarget = name;
+    const menu = document.getElementById('ctxMenu');
+    menu.classList.add('visible');
+
+    // Position within viewport
+    const x = Math.min(e.clientX, window.innerWidth - menu.offsetWidth - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8);
+    menu.style.left = x + 'px';
+    menu.style.top  = y + 'px';
+  }
+
+  function hideCtxMenu() {
+    document.getElementById('ctxMenu').classList.remove('visible');
+  }
+
+  document.getElementById('ctxView').addEventListener('click', () => {
+    if (ctxTarget) openLightbox(ctxTarget);
+    hideCtxMenu();
+  });
+
+  document.getElementById('ctxMeta').addEventListener('click', () => {
+    if (ctxTarget) openMetaModal(ctxTarget);
+    hideCtxMenu();
+  });
+
+  document.getElementById('ctxNav').addEventListener('click', () => {
+    if (ctxTarget) window.open(`/api/image?file=${encodeURIComponent(ctxTarget)}`, '_blank');
+    hideCtxMenu();
+  });
+
+  document.getElementById('ctxTag').addEventListener('click', () => {
+    if (ctxTarget) openTagModal(ctxTarget);
+    hideCtxMenu();
+  });
+
+  document.addEventListener('click', () => hideCtxMenu());
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
+
+  // ── METADATA MODAL ────────────────────────────────────────
+  async function openMetaModal(name) {
+    const overlay = document.getElementById('metaModalOverlay');
+    const body    = document.getElementById('metaModalBody');
+    document.getElementById('metaModalFilename').textContent = name;
+    body.innerHTML = '<div class="panel-empty"><div class="loader"></div><p>Loading metadata…</p></div>';
+    overlay.classList.add('open');
+    setStatus(`Loading metadata for ${name}…`);
+
+    try {
+      const res  = await fetch(`/api/metadata?file=${encodeURIComponent(name)}`);
+      const meta = await res.json();
+      body.innerHTML = buildMetaHtml(name, meta);
+      setStatus(`${name} — metadata loaded`);
+    } catch (e) {
+      body.innerHTML = '<div class="panel-empty"><p>Failed to load metadata</p></div>';
+    }
+  }
+
+  function closeMetaModal(e) {
+    // Only close if clicking the overlay backdrop, not the modal itself
+    if (e.target === document.getElementById('metaModalOverlay')) {
+      document.getElementById('metaModalOverlay').classList.remove('open');
+    }
+  }
+
+  function buildMetaHtml(name, meta) {
+    let html = '';
+
+    // Filename header
+    const dims = meta.image ? `${meta.image.Width} × ${meta.image.Height}  ·  ${meta.image.Megapixels}` : '';
+    html += `<div class="meta-filename">
+      <h3>${escHtml(name)}</h3>
+      ${dims ? `<div class="dims">${escHtml(dims)}</div>` : ''}
+    </div>`;
+
+    const sections = [
+      { key: 'file',  label: 'File' },
+      { key: 'image', label: 'Image' },
+      { key: 'exif',  label: 'EXIF / Camera' },
+      { key: 'gps',   label: 'GPS' },
+    ];
+
+    sections.forEach(({ key, label }) => {
+      const data = meta[key];
+      if (!data || Object.keys(data).length === 0) return;
+      const entries = Object.entries(data);
+      html += `<div class="meta-section" id="msec-${key}">
+        <div class="meta-section-header" onclick="toggleSection('msec-${key}')">
+          <span class="meta-section-label">${label}</span>
+          <span class="meta-section-count">${entries.length}</span>
+          <span class="section-chevron">▾</span>
+        </div>
+        <div class="meta-rows">`;
+      entries.forEach(([k, v]) => {
+        let valHtml = k === 'Maps Link'
+          ? `<a href="${escHtml(v)}" target="_blank">Open in Maps ↗</a>`
+          : `<span>${escHtml(String(v))}</span>`;
+        html += `<div class="meta-row">
+          <span class="meta-key" title="${escHtml(k)}">${escHtml(k)}</span>
+          <span class="meta-val">${valHtml}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+    });
+
+    if (meta._error) {
+      html += `<div style="padding:12px 16px;font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted)">⚠ ${escHtml(meta._error)}</div>`;
+    }
+    return html;
+  }
+
+  function toggleSection(id) {
+    document.getElementById(id)?.classList.toggle('collapsed');
+  }
+
+  function updateSelectionUI() {} // no-op, kept for safety
+
+  // LIGHTBOX
+  function openLightbox(name) {
+    lightboxIndex = filteredImages.indexOf(name);
+    showLightboxImage(lightboxIndex);
+    document.getElementById('lightbox').classList.add('open');
+    showFilterHud();
+  }
+
+  function showLightboxImage(i) {
+    if (i < 0 || i >= filteredImages.length) return;
+    lightboxIndex = i;
+    galleryCursor = i; // keep gallery cursor in sync
+    const name = filteredImages[i];
+    document.getElementById('lightboxImg').src = `/api/image?file=${encodeURIComponent(name)}`;
+    setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · 1-9, 0: filters`);
+    // Keep current filter when navigating — user can reset with 1
+    showFilterHud();
+  }
+
+  function lightboxNav(dir) {
+    let next = lightboxIndex + dir;
+    if (next < 0) next = filteredImages.length - 1;
+    if (next >= filteredImages.length) next = 0;
+    showLightboxImage(next);
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    resetLightboxFilter();
+    hideFilterHud();
+    // Scroll the last-viewed card into view in the gallery
+    const active = document.querySelector('.kb-focus');
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── MULTI-SELECT STATE ────────────────────────────────────────────────────
+  let newFiles      = new Set();   // filenames marked new this session (in-memory only)
+  let multiSelected = new Set();   // filenames currently selected
+  let ctrlMode      = false;       // true while Ctrl is held
+
+  function toggleMultiSelect(name) {
+    if (multiSelected.has(name)) {
+      multiSelected.delete(name);
+    } else {
+      multiSelected.add(name);
+    }
+    updateMultiSelectUI();
+  }
+
+  function clearMultiSelect() {
+    multiSelected.clear();
+    updateMultiSelectUI();
+  }
+
+  function updateMultiSelectUI() {
+    const count = multiSelected.size;
+    // Update cards
+    document.querySelectorAll('.photo-card, .strip-card').forEach(el => {
+      const name = el.dataset.name;
+      const sel  = multiSelected.has(name);
+      el.classList.toggle('ms-selected', sel);
+      // Add/remove tick badge
+      const existing = el.querySelector('.ms-check');
+      if (sel && !existing) {
+        const tick = document.createElement('div');
+        tick.className = 'ms-check';
+        tick.textContent = '✓';
+        el.appendChild(tick);
+      } else if (!sel && existing) {
+        existing.remove();
+      }
+    });
+    // Show/hide action bar
+    const bar = document.getElementById('multiBar');
+    bar.classList.toggle('visible', count > 0);
+    document.getElementById('multiBarCount').textContent =
+      count === 1 ? '1 image selected' : `${count} images selected`;
+    // Status hint
+    if (count > 0) {
+      setStatus(`${count} selected — Space to toggle · Enter to tag · Esc to clear`);
+    }
+  }
+
+  // ── GALLERY NAVIGATION ─────────────────────────────────────────────────────
+  let galleryCursor = -1;
+
+  function applyGalleryCursor() {
+    document.querySelectorAll('.photo-card, .strip-card').forEach(el => {
+      // kb-focus = normal cursor; ms-cursor = ctrl-mode cursor (dashed outline)
+      el.classList.toggle('kb-focus',  !ctrlMode && el.dataset.name === filteredImages[galleryCursor]);
+      el.classList.toggle('ms-cursor',  ctrlMode && el.dataset.name === filteredImages[galleryCursor]);
+    });
+    const active = document.querySelector('.kb-focus, .ms-cursor');
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    const name = filteredImages[galleryCursor];
+    if (ctrlMode) {
+      const sel = multiSelected.has(name);
+      setStatus(`[Ctrl] ${name}  (${galleryCursor + 1}/${filteredImages.length})  — Space to ${sel ? 'deselect' : 'select'} · Enter to tag`);
+    } else {
+      setStatus(`${name}  (${galleryCursor + 1} / ${filteredImages.length})  — Enter to open`);
+      showTagHoverBox(name);
+    }
+  }
+
+  function galleryNav(dir) {
+    if (filteredImages.length === 0) return;
+    galleryCursor = galleryCursor < 0
+      ? (dir === 1 ? 0 : filteredImages.length - 1)
+      : (galleryCursor + dir + filteredImages.length) % filteredImages.length;
+    applyGalleryCursor();
+  }
+
+  function galleryNavRows(dir) {
+    if (filteredImages.length === 0) return;
+    if (galleryCursor < 0) {
+      galleryCursor = dir === 1 ? 0 : filteredImages.length - 1;
+      applyGalleryCursor();
+      return;
+    }
+    if (currentView === 'strip') {
+      galleryCursor = (galleryCursor + dir + filteredImages.length) % filteredImages.length;
+      applyGalleryCursor();
+      return;
+    }
+    const grid  = document.querySelector('.grid-view');
+    if (!grid) return;
+    const cards = Array.from(grid.children);
+    if (cards.length < 2) return;
+    const firstTop = cards[0].getBoundingClientRect().top;
+    let cols = 0;
+    for (const c of cards) {
+      if (Math.abs(c.getBoundingClientRect().top - firstTop) < 4) cols++;
+      else break;
+    }
+    cols = Math.max(1, cols);
+    const next = Math.max(0, Math.min(filteredImages.length - 1, galleryCursor + dir * cols));
+    galleryCursor = next;
+    applyGalleryCursor();
+  }
+
+  // Track Ctrl key globally
+  document.addEventListener('keydown', e => { if (e.key === 'Control') ctrlMode = true;  });
+  document.addEventListener('keyup',   e => { if (e.key === 'Control') ctrlMode = false; });
+  window.addEventListener('blur',      ()  => { ctrlMode = false; });  // safety: tab away
+
+  // ── MAIN KEYBOARD HANDLER ─────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    // Don't hijack keys when typing in inputs
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    const inLightbox = document.getElementById('lightbox').classList.contains('open');
+    const anyModal   = ['metaModalOverlay','tagModalOverlay','renameModalOverlay',
+                        'logoutModalOverlay'].some(id =>
+                          document.getElementById(id)?.classList.contains('open'));
+
+    // Escape — clear multi-select first, then close modals/lightbox
+    if (e.key === 'Escape') {
+      if (inLightbox) { closeLightbox(); return; }
+      if (anyModal)   { return; }  // let individual modal handlers deal with it
+      if (multiSelected.size > 0) { clearMultiSelect(); return; }
+    }
+
+    // Don't process navigation when a modal is open
+    if (anyModal) return;
+
+    // ── LIGHTBOX keys ──────────────────────────────────────────────────────
+    if (inLightbox) {
+      if (e.key === 'ArrowUp') { e.preventDefault(); closeLightbox(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        lightboxNav(e.key === 'ArrowLeft' ? -1 : 1);
+      }
+      // 1-4: colour/greyscale filters
+      if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key)) {
+        e.preventDefault();
+        setLightboxFilter(parseInt(e.key));
+      }
+      return;
+    }
+
+    // ── GALLERY navigation ─────────────────────────────────────────────────
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+      if (e.key === 'ArrowLeft')  galleryNav(-1);
+      if (e.key === 'ArrowRight') galleryNav(1);
+      if (e.key === 'ArrowUp')    galleryNavRows(-1);
+      if (e.key === 'ArrowDown')  galleryNavRows(1);
+      return;
+    }
+
+    // Space — toggle selection of cursor image (only when Ctrl held OR multi-select active)
+    if (e.key === ' ' && galleryCursor >= 0 && (ctrlMode || multiSelected.size > 0)) {
+      e.preventDefault();
+      toggleMultiSelect(filteredImages[galleryCursor]);
+      applyGalleryCursor();  // refresh status text
+      return;
+    }
+
+    // Enter — depends on mode
+    if (e.key === 'Enter' && galleryCursor >= 0) {
+      e.preventDefault();
+      if (multiSelected.size > 0) {
+        // Multi-select mode: Enter opens bulk tag modal
+        openMultiTagModal();
+      } else {
+        // Normal mode: Enter opens lightbox
+        openLightbox(filteredImages[galleryCursor]);
+      }
+      return;
+    }
+  });
+
+  // Click outside lightbox
+  document.getElementById('lightbox').addEventListener('click', e => {
+    if (e.target === document.getElementById('lightbox')) closeLightbox();
+  });
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function escJs(s) {
+    return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  }
+
+
+  // ── TAGGING ───────────────────────────────────────────────────────────────
+
+  let tagTarget = null;       // filename being tagged
+  let tagKeywords = [];       // current chip list
+  let allTagsCache = {};      // {filename: {keywords,category,notes}}
+
+  async function loadAllTags() {
+    try {
+      const res = await fetch('/api/tags/all');
+      allTagsCache = await res.json();
+      renderTagBadges();
+      rebuildFilterBar();
+    } catch(e) {
+      console.warn('loadAllTags failed:', e);
+    }
+  }
+
+  function renderTagBadges() {
+    // Remove existing badges
+    document.querySelectorAll('.tag-badge').forEach(el => el.remove());
+    // Also re-render new badges (they share the same card DOM)
+    renderNewBadges();
+    // Add badge to cards that have tags
+    document.querySelectorAll('.photo-card, .strip-card').forEach(card => {
+      const name = card.dataset.name;
+      const data = allTagsCache[name];
+      if (!data) return;
+      const parts = [];
+      if (data.category) parts.push(data.category);
+      if (data.keywords && data.keywords.length) parts.push(`${data.keywords.length}kw`);
+      if (!parts.length) return;
+      const badge = document.createElement('div');
+      badge.className = 'tag-badge';
+      badge.textContent = parts.join(' · ');
+      card.style.position = 'relative';
+      card.appendChild(badge);
+    });
+  }
+
+  async function openTagModal(name) {
+    tagTarget = name;
+    tagKeywords = [];
+
+    document.getElementById('tagModalFilename').textContent = name;
+    document.getElementById('tagCategory').value = '';
+    document.getElementById('tagNotes').value = '';
+    document.getElementById('tagSaveStatus').textContent = '';
+    renderChips();
+
+    // Load existing sidecar
+    try {
+      const res = await fetch(`/api/tags?file=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      tagKeywords = [...(data.keywords || [])];
+      document.getElementById('tagCategory').value = data.category || '';
+      document.getElementById('tagNotes').value = data.notes || '';
+      renderChips();
+    } catch(e) {}
+
+    // Populate suggestions from other images
+    const allKw = new Set();
+    const allCat = new Set();
+    for (const [fn, d] of Object.entries(allTagsCache)) {
+      if (fn === name) continue;
+      (d.keywords || []).forEach(k => allKw.add(k));
+      if (d.category) allCat.add(d.category);
+    }
+    const suggestionsEl = document.getElementById('tagSuggestions');
+    suggestionsEl.innerHTML = '';
+    const all = [...allCat, ...allKw];
+    if (all.length) {
+      document.getElementById('tagExistingWrap').style.display = '';
+      all.forEach(kw => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-suggestion-chip';
+        chip.textContent = kw;
+        chip.onclick = () => addKeyword(kw);
+        suggestionsEl.appendChild(chip);
+      });
+    } else {
+      document.getElementById('tagExistingWrap').style.display = 'none';
+    }
+
+    document.getElementById('tagModalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('tagCategory').focus(), 100);
+  }
+
+  function closeTagModal(e) {
+    if (e && e.target !== document.getElementById('tagModalOverlay')) return;
+    document.getElementById('tagModalOverlay').classList.remove('open');
+    tagTarget = null;
+  }
+
+  // ── CHIP INPUT ─────────────────────────────────────────────────────────────
+
+  function renderChips() {
+    const wrap = document.getElementById('tagChipsWrap');
+    const input = document.getElementById('tagKeywordInput');
+    // Remove old chips (keep the input)
+    wrap.querySelectorAll('.tag-chip').forEach(el => el.remove());
+    // Re-insert chips before the input
+    tagKeywords.forEach((kw, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${escHtml(kw)}<button class="tag-chip-remove" onclick="removeKeyword(${i})" tabindex="-1">✕</button>`;
+      wrap.insertBefore(chip, input);
+    });
+  }
+
+  function addKeyword(kw) {
+    kw = kw.trim().replace(/,+$/, '').trim();
+    if (!kw || tagKeywords.includes(kw)) return;
+    tagKeywords.push(kw);
+    renderChips();
+    document.getElementById('tagKeywordInput').value = '';
+  }
+
+  function removeKeyword(i) {
+    tagKeywords.splice(i, 1);
+    renderChips();
+  }
+
+  document.getElementById('tagKeywordInput').addEventListener('keydown', e => {
+    const val = e.target.value.trim();
+    if ((e.key === 'Enter' || e.key === ',') && val) {
+      e.preventDefault();
+      addKeyword(val.replace(/,$/, ''));
+    }
+    if (e.key === 'Backspace' && !val && tagKeywords.length) {
+      removeKeyword(tagKeywords.length - 1);
+    }
+  });
+
+  document.getElementById('tagKeywordInput').addEventListener('blur', e => {
+    const val = e.target.value.trim().replace(/,$/, '');
+    if (val) addKeyword(val);
+  });
+
+  // ── SAVE / EXPORT ──────────────────────────────────────────────────────────
+
+  async function saveTags() {
+    if (!tagTarget) return;
+    // Flush any pending chip input
+    const pending = document.getElementById('tagKeywordInput').value.trim().replace(/,$/, '');
+    if (pending) addKeyword(pending);
+
+    const payload = {
+      file: tagTarget,
+      keywords: [...tagKeywords],
+      category: document.getElementById('tagCategory').value.trim(),
+      notes: document.getElementById('tagNotes').value.trim(),
+    };
+
+    const status = document.getElementById('tagSaveStatus');
+    status.style.color = 'var(--text-muted)';
+    status.textContent = 'Saving…';
+
+    let res, data;
+    try {
+      res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+    } catch(e) {
+      status.style.color = '#e05';
+      status.textContent = `✘ Cannot reach server: ${e.message}`;
+      return;
+    }
+
+    try {
+      data = await res.json();
+    } catch(e) {
+      status.style.color = '#e05';
+      status.textContent = `✘ Bad response (HTTP ${res.status})`;
+      return;
+    }
+
+    if (data.ok) {
+      status.style.color = 'var(--accent)';
+      status.textContent = '✔ Saved';
+      allTagsCache[tagTarget] = payload;
+      renderTagBadges();
+      rebuildFilterBar();
+      applyFilters();
+      setTimeout(() => {
+        document.getElementById('tagModalOverlay').classList.remove('open');
+      }, 700);
+    } else {
+      status.style.color = '#e05';
+      status.textContent = `✘ ${data.error || 'Save failed'}`;
+    }
+  }
+
+  async function exportTagsToExif() {
+    if (!tagTarget) return;
+    // Save first so EXIF bake uses latest values
+    await saveTags();
+    const status = document.getElementById('tagSaveStatus');
+    status.style.color = 'var(--text-muted)';
+    status.textContent = 'Writing EXIF…';
+    try {
+      const res = await fetch('/api/tags/export', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({file: tagTarget}),
+      });
+      const data = await res.json();
+      status.style.color = data.ok ? 'var(--accent)' : '#e05';
+      status.textContent = data.ok ? `✔ ${data.message}` : `✘ ${data.message}`;
+    } catch(e) {
+      status.style.color = '#e05';
+      status.textContent = '✘ Network error';
+    }
+  }
+
+  // Keyboard: Escape closes tag modal too
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('tagModalOverlay').classList.contains('open')) {
+      document.getElementById('tagModalOverlay').classList.remove('open');
+    }
+  });
+
+
+  // ── TAG FILTER BAR ────────────────────────────────────────────────────────
+
+  let activeFilters = new Set(); // values like "cat:Holiday" or "kw:sunset"
+
+  function rebuildFilterBar() {
+    const bar = document.getElementById('tagFilterBar');
+
+    // Collect all unique categories and keywords across tagged images
+    const cats = new Set();
+    const kws  = new Set();
+    for (const d of Object.values(allTagsCache)) {
+      if (d.category) cats.add(d.category);
+      (d.keywords || []).forEach(k => kws.add(k));
+    }
+
+    const hasNew = newFiles.size > 0;
+
+    if (cats.size === 0 && kws.size === 0 && !hasNew) {
+      bar.classList.add('empty');
+      document.getElementById('mainLayout').classList.remove('has-tagbar');
+      return;
+    }
+
+    bar.classList.remove('empty');
+    document.getElementById('mainLayout').classList.add('has-tagbar');
+
+    // Rebuild chips
+    bar.innerHTML = '<span class="filter-label">Filter</span>';
+
+    // "New" chip — always first if there are new files
+    if (hasNew) {
+      const chip = document.createElement('span');
+      chip.className = 'filter-chip filter-chip-new' + (activeFilters.has('new') ? ' active' : '');
+      chip.dataset.filter = 'new';
+      chip.innerHTML = `🆕 New <span style="opacity:0.7;font-size:0.6em">(${newFiles.size})</span>`;
+      chip.addEventListener('click', () => toggleFilter('new'));
+      bar.appendChild(chip);
+
+      // "Clear new" button
+      const clrNew = document.createElement('button');
+      clrNew.className = 'filter-clear';
+      clrNew.style.cssText = 'margin-left:0;color:var(--text-muted);font-size:0.6rem';
+      clrNew.textContent = '✕ dismiss';
+      clrNew.title = 'Mark all new images as seen';
+      clrNew.addEventListener('click', clearNewFiles);
+      bar.appendChild(clrNew);
+
+      if (cats.size > 0 || kws.size > 0) {
+        const sep = document.createElement('div');
+        sep.className = 'filter-sep';
+        bar.appendChild(sep);
+      }
+    }
+
+    if (cats.size) {
+      [...cats].sort().forEach(cat => {
+        const chip = document.createElement('span');
+        chip.className = 'filter-chip filter-chip-cat' + (activeFilters.has('cat:' + cat) ? ' active' : '');
+        chip.dataset.filter = 'cat:' + cat;
+        chip.textContent = cat;
+        chip.addEventListener('click', () => toggleFilter('cat:' + cat));
+        bar.appendChild(chip);
+      });
+    }
+
+    if (cats.size && kws.size) {
+      const sep = document.createElement('div');
+      sep.className = 'filter-sep';
+      bar.appendChild(sep);
+    }
+
+    if (kws.size) {
+      [...kws].sort().forEach(kw => {
+        const chip = document.createElement('span');
+        chip.className = 'filter-chip filter-chip-kw' + (activeFilters.has('kw:' + kw) ? ' active' : '');
+        chip.dataset.filter = 'kw:' + kw;
+        chip.textContent = kw;
+        chip.addEventListener('click', () => toggleFilter('kw:' + kw));
+        bar.appendChild(chip);
+      });
+    }
+
+    if (activeFilters.size) {
+      const clr = document.createElement('button');
+      clr.className = 'filter-clear';
+      clr.textContent = '✕ Clear filters';
+      clr.addEventListener('click', clearFilters);
+      bar.appendChild(clr);
+    }
+  }
+
+  function toggleFilter(key) {
+    if (activeFilters.has(key)) {
+      activeFilters.delete(key);
+    } else {
+      activeFilters.add(key);
+    }
+    applyFilters();
+    rebuildFilterBar();
+  }
+
+  function clearFilters() {
+    activeFilters.clear();
+    applyFilters();
+    rebuildFilterBar();
+  }
+
+  function applyFilters() {
+    const searchQ = document.getElementById('searchInput').value.toLowerCase().trim();
+
+    filteredImages = allImages.filter(name => {
+      // Text search
+      if (searchQ && !name.toLowerCase().includes(searchQ)) return false;
+
+      // Tag filters — image must match ALL active filters (AND logic)
+      if (activeFilters.size === 0) return true;
+      const data = allTagsCache[name] || {};
+      for (const f of activeFilters) {
+        if (f === 'new') {
+          if (!newFiles.has(name)) return false;
+        } else if (f.startsWith('cat:')) {
+          if (data.category !== f.slice(4)) return false;
+        } else if (f.startsWith('kw:')) {
+          if (!(data.keywords || []).includes(f.slice(3))) return false;
+        }
+      }
+      return true;
+    });
+
+    galleryCursor = -1;
+    const inner = document.getElementById('galleryInner');
+
+    if (filteredImages.length === 0) {
+      inner.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">◻</div>
+        <h2>No images match</h2>
+        <p>Try a different filter combination</p>
+      </div>`;
+      setStatus(`0 of ${allImages.length} images match`);
+      return;
+    }
+
+    setStatus(`${filteredImages.length} of ${allImages.length} images`);
+    renderGallery();
+  }
+
+  // Patch search input to use applyFilters
+  document.getElementById('searchInput').addEventListener('input', () => applyFilters());
+
+  // ── HOVER / FOCUS TAG BOX ─────────────────────────────────────────────────
+
+  let hoverBoxTimeout = null;
+
+  function showTagHoverBox(name) {
+    clearTimeout(hoverBoxTimeout);
+    const box = document.getElementById('tagHoverBox');
+    const data = allTagsCache[name];
+
+    box.innerHTML = '';
+
+    // Filename
+    const fn = document.createElement('span');
+    fn.className = 'thb-filename';
+    fn.textContent = name;
+    box.appendChild(fn);
+
+    const isNew = newFiles.has(name);
+    if (isNew) {
+      const newEl = document.createElement('span');
+      newEl.className = 'thb-cat';
+      newEl.style.cssText = 'background:var(--accent);color:#000;padding:1px 6px;border-radius:3px;font-size:0.6rem;font-weight:700';
+      newEl.textContent = '🆕 NEW';
+      box.appendChild(newEl);
+    }
+
+    if (!data || (!data.category && !data.keywords?.length && !data.notes)) {
+      if (!isNew) {
+        const empty = document.createElement('span');
+        empty.className = 'thb-empty';
+        empty.textContent = 'No tags';
+        box.appendChild(empty);
+      }
+    } else {
+      if (data.category) {
+        const sep = document.createElement('div');
+        sep.className = 'thb-sep';
+        box.appendChild(sep);
+        const cat = document.createElement('span');
+        cat.className = 'thb-cat';
+        cat.textContent = data.category;
+        box.appendChild(cat);
+      }
+
+      (data.keywords || []).forEach(kw => {
+        const chip = document.createElement('span');
+        chip.className = 'thb-kw';
+        chip.textContent = kw;
+        box.appendChild(chip);
+      });
+
+      if (data.notes) {
+        const sep = document.createElement('div');
+        sep.className = 'thb-sep';
+        box.appendChild(sep);
+        const notes = document.createElement('span');
+        notes.className = 'thb-notes';
+        notes.textContent = data.notes.split('\n')[0]; // first line only
+        box.appendChild(notes);
+      }
+    }
+
+    box.classList.add('visible');
+
+    // Shift down if tagbar is visible
+    const barVisible = !document.getElementById('tagFilterBar').classList.contains('empty');
+    const headerH = getComputedStyle(document.documentElement).getPropertyValue('--header-h').trim();
+    const tagbarH = barVisible ? getComputedStyle(document.documentElement).getPropertyValue('--tagbar-h').trim() : '0px';
+    box.style.top = `calc(${headerH} + ${tagbarH} + 8px)`;
+  }
+
+  function hideTagHoverBox() {
+    hoverBoxTimeout = setTimeout(() => {
+      document.getElementById('tagHoverBox').classList.remove('visible');
+    }, 120);
+  }
+
+  // Patch makeGridCard and makeStripCard to add hover listeners
+  // We do this by wrapping the gallery container's event delegation
+  document.getElementById('galleryInner').addEventListener('mouseover', e => {
+    const card = e.target.closest('.photo-card, .strip-card');
+    if (card) showTagHoverBox(card.dataset.name);
+  });
+
+  document.getElementById('galleryInner').addEventListener('mouseleave', () => {
+    hideTagHoverBox();
+  });
+
+
+  // ── RENAME ────────────────────────────────────────────────────────────────
+
+  let renameTarget = null;
+  let renameAutoSuggestion = '';
+
+  async function openRenameModal(name) {
+    renameTarget = name;
+    renameAutoSuggestion = '';
+
+    const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+    const stem = ext ? name.slice(0, -ext.length) : name;
+
+    document.getElementById('renameCurrentName').textContent = name;
+    document.getElementById('renameInput').value = stem;
+    document.getElementById('renameExt').textContent = ext;
+    document.getElementById('renameStatus').textContent = '';
+    document.getElementById('renameAutoPreview').textContent = 'Loading…';
+    document.getElementById('renameUseBtn').disabled = true;
+
+    document.getElementById('renameModalOverlay').classList.add('open');
+    setTimeout(() => {
+      const inp = document.getElementById('renameInput');
+      inp.focus();
+      inp.select();
+    }, 80);
+
+    // Fetch auto-suggestion
+    try {
+      const res = await fetch(`/api/rename/suggest?file=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      renameAutoSuggestion = data.suggestion || '';
+      document.getElementById('renameAutoPreview').textContent =
+        renameAutoSuggestion ? renameAutoSuggestion + ext : '—';
+      document.getElementById('renameUseBtn').disabled = !renameAutoSuggestion;
+    } catch(e) {
+      document.getElementById('renameAutoPreview').textContent = 'Could not load suggestion';
+    }
+  }
+
+  function closeRenameModal(e) {
+    if (e && e.target !== document.getElementById('renameModalOverlay')) return;
+    document.getElementById('renameModalOverlay').classList.remove('open');
+    renameTarget = null;
+  }
+
+  function useAutoSuggestion() {
+    if (!renameAutoSuggestion) return;
+    document.getElementById('renameInput').value = renameAutoSuggestion;
+    document.getElementById('renameInput').focus();
+  }
+
+  async function doRename() {
+    if (!renameTarget) return;
+    const newStem = document.getElementById('renameInput').value.trim();
+    const status  = document.getElementById('renameStatus');
+
+    if (!newStem) {
+      status.style.color = '#e05';
+      status.textContent = '✘ Please enter a name';
+      return;
+    }
+
+    const ext = renameTarget.includes('.') ? renameTarget.slice(renameTarget.lastIndexOf('.')) : '';
+    const currentStem = ext ? renameTarget.slice(0, -ext.length) : renameTarget;
+    if (newStem === currentStem) {
+      closeRenameModal();
+      return;
+    }
+
+    status.style.color = 'var(--text-muted)';
+    status.textContent = 'Renaming…';
+
+    let res, data;
+    try {
+      res = await fetch('/api/rename', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({file: renameTarget, new_stem: newStem}),
+      });
+    } catch(e) {
+      status.style.color = '#e05';
+      status.textContent = `✘ Cannot reach server: ${e.message}`;
+      return;
+    }
+
+    try { data = await res.json(); } catch(e) {
+      status.style.color = '#e05';
+      status.textContent = `✘ Bad response (HTTP ${res.status})`;
+      return;
+    }
+
+    if (data.ok) {
+      status.style.color = 'var(--accent)';
+      status.textContent = `✔ ${data.message}`;
+
+      const oldName = renameTarget;
+      const newName = data.new_name;
+
+      // Update all in-memory lists
+      const idx = allImages.indexOf(oldName);
+      if (idx !== -1) allImages[idx] = newName;
+      const fidx = filteredImages.indexOf(oldName);
+      if (fidx !== -1) filteredImages[fidx] = newName;
+
+      // Move thumbnail cache entry
+      if (thumbnails[oldName]) {
+        thumbnails[newName] = thumbnails[oldName];
+        delete thumbnails[oldName];
+      }
+
+      // Move tags cache entry
+      if (allTagsCache[oldName]) {
+        allTagsCache[newName] = allTagsCache[oldName];
+        delete allTagsCache[oldName];
+      }
+
+      // Update gallery cursor
+      if (galleryCursor === idx) galleryCursor = idx; // same position, new name
+
+      // Re-render gallery to reflect new name
+      renderGallery();
+      rebuildFilterBar();
+
+      setTimeout(() => {
+        document.getElementById('renameModalOverlay').classList.remove('open');
+        renameTarget = null;
+        // Highlight the renamed card
+        const card = document.querySelector(`[data-name="${CSS.escape(newName)}"]`);
+        if (card) {
+          card.classList.add('kb-focus');
+          card.scrollIntoView({behavior:'smooth', block:'nearest'});
+        }
+        setStatus(`Renamed → ${newName}`);
+      }, 600);
+
+    } else {
+      status.style.color = '#e05';
+      status.textContent = `✘ ${data.message || data.error || 'Rename failed'}`;
+    }
+  }
+
+  // Wire up context menu item
+  document.getElementById('ctxRename').addEventListener('click', () => {
+    if (ctxTarget) openRenameModal(ctxTarget);
+    hideCtxMenu();
+  });
+
+  // Enter key submits rename modal
+  document.getElementById('renameInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doRename();
+    if (e.key === 'Escape') closeRenameModal();
+  });
+
+  // Esc closes rename modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('renameModalOverlay').classList.contains('open')) {
+      closeRenameModal();
+    }
+  });
+
+
+  // ── SESSION + LOGOUT ──────────────────────────────────────────────────────
+
+  async function loadSessionInfo() {
+    try {
+      const res  = await fetch('/api/session');
+      const data = await res.json();
+      const galleryName = data.gallery_name || 'Gallery';
+      document.title = `${galleryName} — Photo Gallery`;
+      const pill = document.getElementById('sessionPill');
+      if (data.is_zip_session) {
+        pill.textContent = `📦 ${data.source_zip}`;
+        pill.className = 'session-pill zip';
+      } else {
+        pill.textContent = `📁 ${galleryName}`;
+        pill.className = 'session-pill folder';
+      }
+      pill.style.display = '';
+      // Update logout button title
+      document.getElementById('logoutBtn').title =
+        `Zip session → photos-datetime.zip and exit`;
+      // Update modal description
+      const desc = data.is_zip_session
+        ? `All images will be zipped to <strong>photos-${data.started_at.replace(/[: ]/g,'-').slice(0,19)}.zip</strong>. The previous zip moves to <strong>previous_sessions/</strong> as a backup. Server will stop.`
+        : `All images in the folder will be zipped to <strong>photos-datetime.zip</strong>. Server will stop.`;
+      document.getElementById('logoutDesc').innerHTML = desc;
+    } catch(e) {
+      console.warn('Could not load session info:', e);
+    }
+  }
+
+  function initiateLogout() {
+    document.getElementById('logoutModalOverlay').classList.add('open');
+    document.getElementById('logoutProgress').style.display = 'none';
+    document.getElementById('logoutStatus').textContent = '';
+    document.getElementById('logoutActions').style.display = 'flex';
+    document.getElementById('logoutConfirmBtn').disabled = false;
+  }
+
+  function closeLogoutModal() {
+    document.getElementById('logoutModalOverlay').classList.remove('open');
+  }
+
+  async function confirmLogout() {
+    // Disable buttons, show progress
+    document.getElementById('logoutConfirmBtn').disabled = true;
+    document.getElementById('logoutActions').style.display = 'none';
+    document.getElementById('logoutProgress').style.display = 'block';
+    document.getElementById('logoutProgressBar').style.width = '40%';
+    document.getElementById('logoutStatus').style.color = 'var(--text-muted)';
+    document.getElementById('logoutStatus').textContent = 'Zipping session…';
+
+    let res, data;
+    try {
+      res = await fetch('/api/logout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({}),
+      });
+    } catch(e) {
+      document.getElementById('logoutStatus').style.color = '#e05';
+      document.getElementById('logoutStatus').textContent = `Cannot reach server: ${e.message}`;
+      document.getElementById('logoutActions').style.display = 'flex';
+      document.getElementById('logoutConfirmBtn').disabled = false;
+      return;
+    }
+
+    try { data = await res.json(); } catch(e) { data = {ok: true}; }
+
+    document.getElementById('logoutProgressBar').style.width = '80%';
+
+    if (data.ok) {
+      document.getElementById('logoutStatus').style.color = 'var(--accent)';
+      document.getElementById('logoutStatus').textContent = data.message || 'Saving…';
+
+      // Poll until server goes away
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        document.getElementById('logoutProgressBar').style.width =
+          Math.min(80 + attempts * 4, 98) + '%';
+        try {
+          await fetch('/api/session');
+        } catch(e) {
+          // Server stopped — done!
+          clearInterval(poll);
+          document.getElementById('logoutProgressBar').style.width = '100%';
+          document.getElementById('logoutStatus').style.color = 'var(--accent)';
+          document.getElementById('logoutStatus').textContent = '✔ Session saved. You can close this tab.';
+          document.getElementById('logoutModal-icon') && (document.querySelector('.logout-modal-icon').textContent = '✔');
+        }
+        if (attempts > 30) clearInterval(poll); // give up after 15s
+      }, 500);
+    } else {
+      document.getElementById('logoutProgress').style.display = 'none';
+      document.getElementById('logoutStatus').style.color = '#e05';
+      document.getElementById('logoutStatus').textContent = `✘ ${data.message || 'Logout failed'}`;
+      document.getElementById('logoutActions').style.display = 'flex';
+      document.getElementById('logoutConfirmBtn').disabled = false;
+    }
+  }
+
+  // Esc closes logout modal (only if not mid-logout)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' &&
+        document.getElementById('logoutModalOverlay').classList.contains('open') &&
+        !document.getElementById('logoutConfirmBtn').disabled) {
+      closeLogoutModal();
+    }
+  });
+
+  loadSessionInfo();
+
+  // ── MULTI-TAG MODAL ───────────────────────────────────────────────────────
+
+  function openMultiTagModal() {
+    if (multiSelected.size === 0) return;
+
+    // Reuse the existing tag modal but adapt it for bulk mode
+    tagTarget    = null;          // null signals bulk mode
+    tagKeywords  = [];
+    document.getElementById('tagModalFilename').textContent =
+      `${multiSelected.size} images selected`;
+    document.getElementById('tagCategory').value  = '';
+    document.getElementById('tagNotes').value     = '';
+    document.getElementById('tagSaveStatus').textContent = '';
+
+    // Load suggestions from existing tags on ALL images (not just one)
+    const allKw = new Set(); const allCat = new Set();
+    for (const [fn, d] of Object.entries(allTagsCache)) {
+      (d.keywords || []).forEach(k => allKw.add(k));
+      if (d.category) allCat.add(d.category);
+    }
+    const suggestionsEl = document.getElementById('tagSuggestions');
+    suggestionsEl.innerHTML = '';
+    const all = [...allCat, ...allKw];
+    document.getElementById('tagExistingWrap').style.display = all.length ? '' : 'none';
+    all.forEach(kw => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-suggestion-chip';
+      chip.textContent = kw;
+      chip.onclick = () => addKeyword(kw);
+      suggestionsEl.appendChild(chip);
+    });
+
+    renderChips();
+    document.getElementById('tagModalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('tagCategory').focus(), 80);
+  }
+
+  // Patch saveTags to handle bulk mode (tagTarget === null)
+  const _origSaveTagsFn = saveTags;
+  saveTags = async function() {
+    if (tagTarget !== null) {
+      // Single-image mode — use original
+      await _origSaveTagsFn();
+      return;
+    }
+
+    // Bulk mode
+    const pending = document.getElementById('tagKeywordInput').value.trim().replace(/,$/, '');
+    if (pending) addKeyword(pending);
+
+    const keywords = [...tagKeywords];
+    const category = document.getElementById('tagCategory').value.trim();
+    const notes    = document.getElementById('tagNotes').value.trim();
+    const names    = [...multiSelected];
+
+    if (!keywords.length && !category && !notes) {
+      document.getElementById('tagSaveStatus').style.color = '#e05';
+      document.getElementById('tagSaveStatus').textContent = 'Add at least one keyword, category, or note';
+      return;
+    }
+
+    const status = document.getElementById('tagSaveStatus');
+    status.style.color = 'var(--text-muted)';
+    status.textContent = `Saving tags to ${names.length} images…`;
+
+    let saved = 0, failed = 0;
+    for (const name of names) {
+      // Merge with existing tags rather than overwrite
+      const existing = allTagsCache[name] || {keywords:[], category:'', notes:''};
+      const merged = {
+        keywords: [...new Set([...existing.keywords, ...keywords])],
+        category: category || existing.category,
+        notes:    notes    || existing.notes,
+      };
+      try {
+        const res = await fetch('/api/tags', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({file: name, ...merged}),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          allTagsCache[name] = merged;
+          saved++;
+        } else { failed++; }
+      } catch(e) { failed++; }
+    }
+
+    renderTagBadges();
+    rebuildFilterBar();
+
+    if (failed === 0) {
+      status.style.color = 'var(--accent)';
+      status.textContent = `✔ Tags applied to ${saved} image${saved !== 1 ? 's' : ''}`;
+      clearMultiSelect();
+      setTimeout(() => document.getElementById('tagModalOverlay').classList.remove('open'), 800);
+    } else {
+      status.style.color = '#e05';
+      status.textContent = `✔ ${saved} saved, ✘ ${failed} failed`;
+    }
+  };
+
+
+  // ── FOLDER WATCH / AUTO-REFRESH ───────────────────────────────────────────
+
+  let _lastHash    = '';
+  let _watchTimer  = null;
+  const WATCH_INTERVAL = 2000;
+
+  async function refreshImages(silent = false) {
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.remove('spinning');
+    void btn.offsetWidth;
+    btn.classList.add('spinning');
+    hideNewImageToast();
+
+    try {
+      const res  = await fetch('/api/images');
+      const data = await res.json();
+      const newList = data.images || [];
+      const newHash = data.hash   || '';
+      const oldSet  = new Set(allImages);
+      const newSet  = new Set(newList);
+      const added   = newList.filter(n => !oldSet.has(n));
+      const removed = allImages.filter(n => !newSet.has(n));
+
+      if (added.length === 0 && removed.length === 0) {
+        if (!silent) setStatus(`No changes — ${allImages.length} images`);
+        _lastHash = newHash;
+        return;
+      }
+
+      allImages = newList;
+      _lastHash = newHash;
+      removed.forEach(n => delete thumbnails[n]);
+      // Update new-files set from the response (server sends it with /api/images)
+      if (data.new_files) {
+        newFiles = new Set(data.new_files);
+        renderNewBadges();
+      }
+      applyFilters();
+      await loadAllTags();
+
+      document.getElementById('headerCount').textContent =
+        `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+
+      const parts = [];
+      if (added.length)   parts.push(`+${added.length} added`);
+      if (removed.length) parts.push(`-${removed.length} removed`);
+
+      // Check if any new images look auto-renamed (image-DATE-TIME pattern)
+      const autoRenamed = added.filter(n =>
+        /[\/\\]?image-\d{4}-\d{2}-\d{2}-\d{6}(-\d+)?\.[a-z]+$/i.test(n)
+      );
+      if (autoRenamed.length && autoRenamed.length === added.length && removed.length > 0) {
+        parts.push(`${autoRenamed.length} auto-renamed`);
+      } else if (autoRenamed.length > 0 && removed.length === 0) {
+        parts.push(`${autoRenamed.length} auto-named`);
+      }
+
+      setStatus(`Refreshed — ${parts.join(', ')} — ${allImages.length} total`);
+
+    } catch(e) {
+      if (!silent) setStatus('Refresh failed — is the server running?');
+    }
+  }
+
+  function manualRefresh() { refreshImages(false); }
+
+  async function pollFolderHash() {
+    try {
+      const res  = await fetch('/api/images/watch');
+      const data = await res.json();
+      const hash = data.hash || '';
+      const ready = data.ready !== false;
+
+      // If we were waiting for startup indexing to finish
+      if (_waitingForReady && ready) {
+        _waitingForReady = false;
+        _lastHash = hash;
+        setStatus('✔ Index ready — loading gallery…');
+        await init();   // re-run init now that server is ready
+        return;
+      }
+
+      if (!ready) {
+        setStatus(`⏳ Indexing… (${data.count || 0} images found so far)`);
+        return;
+      }
+
+      if (_lastHash && hash !== _lastHash) {
+        await refreshImages(true);
+      } else if (!_lastHash) {
+        _lastHash = hash;
+      }
+    } catch(e) {}
+  }
+
+  function showNewImageToast(count) {
+    document.getElementById('toastCount').textContent = count > 0 ? count : 'New';
+    document.getElementById('newImageToast').classList.add('visible');
+  }
+
+  function hideNewImageToast() {
+    document.getElementById('newImageToast').classList.remove('visible');
+  }
+
+  function startFolderWatch() {
+    if (_watchTimer) clearInterval(_watchTimer);
+    _watchTimer = setInterval(pollFolderHash, WATCH_INTERVAL);
+  }
+
+  // R key to refresh
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if ((e.key === 'r' || e.key === 'R') &&
+        !document.getElementById('lightbox').classList.contains('open') &&
+        !['metaModalOverlay','tagModalOverlay','renameModalOverlay','logoutModalOverlay']
+          .some(id => document.getElementById(id)?.classList.contains('open'))) {
+      manualRefresh();
+    }
+  });
+
+
+  // ── DEBUG SCAN ────────────────────────────────────────────────────────────
+  async function openDebugPanel() {
+    document.getElementById('debugModalOverlay').classList.add('open');
+    document.getElementById('debugBody').innerHTML =
+      '<div class="panel-empty"><div class="loader"></div><p>Scanning folder…</p></div>';
+    document.getElementById('debugSummary').textContent = '';
+
+    try {
+      const res  = await fetch('/api/debug/scan');
+      const data = await res.json();
+
+      document.getElementById('debugSummary').textContent =
+        `${data.included} shown  ·  ${data.excluded} excluded  ·  ${data.total_files} total files  ·  ${data.folder}`;
+
+      // Group by: included images, excluded images (wrong ext), other files
+      const included = data.entries.filter(e => e.included);
+      const excluded = data.entries.filter(e => !e.included);
+
+      let html = '';
+
+      // Included
+      html += `<div style="padding:10px 16px 6px;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;font-size:0.6rem;border-bottom:1px solid var(--border)">
+        ✔ Included in gallery (${included.length})</div>`;
+      if (included.length) {
+        html += '<div style="max-height:200px;overflow-y:auto">';
+        included.forEach(e => {
+          html += `<div style="display:flex;gap:12px;padding:3px 16px;border-bottom:1px solid var(--border)" >
+            <span style="color:var(--text);flex:1;word-break:break-all">${escHtml(e.path)}</span>
+            <span style="color:var(--text-muted);white-space:nowrap">${escHtml(e.ext)}</span>
+            <span style="color:var(--text-muted);white-space:nowrap">${(e.size/1024).toFixed(0)} KB</span>
+          </div>`;
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="padding:8px 16px;color:var(--text-muted)">None found</div>';
+      }
+
+      // Excluded (image-like extensions only — skip .gallery.json etc)
+      const imgExcluded = excluded.filter(e =>
+        ['.jpg','.jpeg','.png','.gif','.webp','.bmp','.tiff','.tif','.heic',
+         '.JPG','.JPEG','.PNG','.HEIC','.TIFF','.TIF','.BMP','.WEBP',
+         '.mp4','.mov','.avi','.mkv'].includes(e.ext)
+      );
+      if (imgExcluded.length) {
+        html += `<div style="padding:10px 16px 6px;color:#e05;letter-spacing:0.08em;text-transform:uppercase;font-size:0.6rem;border-bottom:1px solid var(--border);margin-top:4px">
+          ✘ Skipped image-like files (${imgExcluded.length})</div>`;
+        imgExcluded.forEach(e => {
+          html += `<div style="display:flex;gap:12px;padding:3px 16px;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-dim);flex:1;word-break:break-all">${escHtml(e.path)}</span>
+            <span style="color:#e05;white-space:nowrap">${escHtml(e.ext)}</span>
+            <span style="color:var(--text-muted);white-space:nowrap">${e.reason}</span>
+          </div>`;
+        });
+      }
+
+      // Other excluded
+      const otherExcluded = excluded.filter(e => !imgExcluded.includes(e));
+      html += `<div style="padding:10px 16px 6px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;font-size:0.6rem;border-bottom:1px solid var(--border);margin-top:4px">
+        Other files (${otherExcluded.length})</div>`;
+      html += '<div style="max-height:120px;overflow-y:auto">';
+      otherExcluded.forEach(e => {
+        html += `<div style="display:flex;gap:12px;padding:3px 16px;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text-muted);flex:1;word-break:break-all">${escHtml(e.path)}</span>
+          <span style="color:var(--text-muted);white-space:nowrap">${escHtml(e.ext) || '(no ext)'}</span>
+        </div>`;
+      });
+      html += '</div>';
+
+      // Supported extensions list
+      html += `<div style="padding:10px 16px;border-top:1px solid var(--border);color:var(--text-muted);font-size:0.6rem">
+        Supported: ${data.supported_ext.join('  ')}</div>`;
+
+      document.getElementById('debugBody').innerHTML = html;
+
+    } catch(e) {
+      document.getElementById('debugBody').innerHTML =
+        `<div class="panel-empty"><p style="color:#e05">Scan failed: ${escHtml(e.message)}</p></div>`;
+    }
+  }
+
+  function closeDebugModal(e) {
+    if (e && e.target !== document.getElementById('debugModalOverlay')) return;
+    document.getElementById('debugModalOverlay').classList.remove('open');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('debugModalOverlay')?.classList.contains('open')) {
+      document.getElementById('debugModalOverlay').classList.remove('open');
+    }
+  });
+
+
+  // ── NEW FILES ─────────────────────────────────────────────────────────────
+
+  async function loadNewFiles() {
+    try {
+      const res  = await fetch('/api/new');
+      const data = await res.json();
+      newFiles = new Set(data.new_files || []);
+      renderNewBadges();
+      rebuildFilterBar();   // add/remove the New chip
+    } catch(e) {}
+  }
+
+  function renderNewBadges() {
+    // Remove existing new badges
+    document.querySelectorAll('.new-badge').forEach(el => el.remove());
+    if (newFiles.size === 0) return;
+    document.querySelectorAll('.photo-card, .strip-card').forEach(card => {
+      if (newFiles.has(card.dataset.name)) {
+        const badge = document.createElement('div');
+        badge.className = 'new-badge';
+        badge.textContent = 'new';
+        card.style.position = 'relative';
+        card.appendChild(badge);
+      }
+    });
+  }
+
+  async function clearNewFiles() {
+    newFiles.clear();
+    renderNewBadges();
+    // If "new" filter is active, clear it
+    activeFilters.forEach(f => { if (f === 'new') activeFilters.delete(f); });
+    applyFilters();
+    rebuildFilterBar();
+    // Tell server to clear too (so /api/images returns empty new_files)
+    try { await fetch('/api/new/clear'); } catch(e) {}
+  }
+
+
+
+
+  // ── DUPLICATES ────────────────────────────────────────────────────────────
+
+  let _dupLog   = [];   // local copy of server's dup log
+  let _dupCount = 0;    // current count, kept in sync with server
+
+  async function loadDuplicates() {
+    try {
+      const res  = await fetch('/api/duplicates');
+      const data = await res.json();
+      _dupLog   = data.log   || [];
+      _dupCount = data.count || 0;
+      updateDupIndicator();
+    } catch(e) {}
+  }
+
+  function updateDupIndicator() {
+    const ind = document.getElementById('dupIndicator');
+    document.getElementById('dupCount').textContent = _dupCount;
+    ind.classList.toggle('visible', _dupCount > 0);
+  }
+
+  function openDupPanel() {
+    document.getElementById('dupModalOverlay').classList.add('open');
+    renderDupLog();
+  }
+
+  function closeDupModal(e) {
+    if (e && e.target !== document.getElementById('dupModalOverlay')) return;
+    document.getElementById('dupModalOverlay').classList.remove('open');
+  }
+
+  async function clearDupLog() {
+    try { await fetch('/api/duplicates/clear-log'); } catch(e) {}
+    _dupLog   = [];
+    _dupCount = 0;
+    updateDupIndicator();
+    renderDupLog();
+  }
+
+  async function renderDupLog() {
+    const body = document.getElementById('dupBody');
+    body.innerHTML = '<div class="panel-empty"><div class="loader"></div><p>Loading…</p></div>';
+
+    let data;
+    try {
+      const res = await fetch('/api/duplicates');
+      data = await res.json();
+    } catch(e) {
+      body.innerHTML = '<div class="panel-empty"><p style="color:#e05">Failed to load</p></div>';
+      return;
+    }
+
+    _dupLog   = data.log      || [];
+    _dupCount = data.disk_count || 0;
+    updateDupIndicator();
+
+    const onDisk   = data.on_disk  || [];
+    const logItems = _dupLog;
+
+    document.getElementById('dupModalSummary').textContent =
+      onDisk.length ? `${onDisk.length} file(s) in duplicates/ folder` : 'duplicates/ folder is empty';
+
+    if (onDisk.length === 0 && logItems.length === 0) {
+      body.innerHTML = '<div class="panel-empty"><div style="font-size:2rem;opacity:0.3">✔</div><p>No duplicates — folder is empty</p></div>';
+      return;
+    }
+
+    let html = '';
+
+    // ── Files currently in duplicates/ (can be restored or deleted) ──────────
+    if (onDisk.length > 0) {
+      html += `<div class="dup-ondisk-header">Files in duplicates/ folder (${onDisk.length})</div>`;
+      onDisk.forEach(file => {
+        // Find matching log entry if any
+        const logEntry = logItems.find(e => e.dest === file.rel && !e.restored && !e.deleted);
+        const isExact  = logEntry?.reason?.includes('SHA-256');
+        const typeHtml = logEntry
+          ? `<span class="dup-type-badge ${isExact ? 'dup-type-exact' : 'dup-type-visual'}">${isExact ? 'EXACT' : 'VISUAL'}</span>`
+          : '';
+        const keptRel  = logEntry?.kept || '';
+        const sizekb   = (file.size / 1024).toFixed(0);
+
+        html += `<div class="dup-review-row" id="duprow-${escHtml(file.rel).replace(/[^a-z0-9]/gi,'_')}">
+          <div class="dup-thumb-pair">
+            <div class="dup-thumb-wrap">
+              <img class="dup-thumb" src="/api/image?file=${encodeURIComponent(file.rel)}"
+                   onerror="this.style.background='var(--surface2)'" alt="duplicate">
+              <span class="dup-thumb-label moved">dup</span>
+            </div>
+            ${keptRel ? `<div class="dup-thumb-wrap">
+              <img class="dup-thumb" src="/api/image?file=${encodeURIComponent(keptRel)}"
+                   onerror="this.style.background='var(--surface2)'" alt="kept">
+              <span class="dup-thumb-label kept">kept</span>
+            </div>` : ''}
+          </div>
+          <div class="dup-info">
+            <div class="dup-name" title="${escHtml(file.rel)}">${typeHtml} ${escHtml(file.name)}</div>
+            <div class="dup-meta">${sizekb} KB${logEntry ? ' · kept: ' + escHtml(keptRel.split('/').pop()) : ''}</div>
+            ${logEntry?.reason ? `<div class="dup-meta" style="margin-top:2px">${escHtml(logEntry.reason)}</div>` : ''}
+          </div>
+          <div class="dup-actions">
+            <button class="dup-action-btn restore"
+              onclick="restoreDup('${escHtml(file.rel)}','${escHtml(keptRel)}',this)">↩ Restore</button>
+            <button class="dup-action-btn delete"
+              onclick="deleteDup('${escHtml(file.rel)}',this)">🗑 Delete</button>
+          </div>
+        </div>`;
+      });
+    }
+
+    body.innerHTML = html || '<div class="panel-empty"><p style="color:var(--text-muted)">No files on disk</p></div>';
+  }
+
+  async function restoreDup(destRel, keptRel, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Restoring…';
+    try {
+      const res  = await fetch('/api/duplicates/restore', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({dest: destRel, target: keptRel}),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const rowId = 'duprow-' + destRel.replace(/[^a-z0-9]/gi,'_');
+        const row   = document.getElementById(rowId);
+        if (row) { row.classList.add('restored'); row.querySelector('.dup-actions').innerHTML = '<span style="color:#2ecc71;font-size:0.65rem;font-family:var(--font-mono)">↩ Restored</span>'; }
+        await renderDupLog();
+        await refreshImages(true);
+      } else {
+        btn.textContent = '✘ ' + (data.error || 'Failed');
+        btn.disabled = false;
+      }
+    } catch(e) {
+      btn.textContent = '✘ Error'; btn.disabled = false;
+    }
+  }
+
+  async function deleteDup(destRel, btn) {
+    if (!confirm(`Permanently delete ${destRel.split('/').pop()}?\nThis cannot be undone.`)) return;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try {
+      const res  = await fetch('/api/duplicates/delete', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({dest: destRel}),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        await renderDupLog();
+      } else {
+        btn.textContent = '✘ ' + (data.error || 'Failed');
+        btn.disabled = false;
+      }
+    } catch(e) {
+      btn.textContent = '✘ Error'; btn.disabled = false;
+    }
+  }
+
+  // Poll for new duplicates alongside the folder watch
+  // We piggyback on the watch response which includes dup_count
+  const _origPollFolderHash = pollFolderHash;
+  pollFolderHash = async function() {
+    try {
+      const res  = await fetch('/api/images/watch');
+      const data = await res.json();
+      const hash = data.hash || '';
+
+      // Check for new duplicates
+      if (typeof data.dup_count === 'number' && data.dup_count !== _dupCount) {
+        await loadDuplicates();
+      }
+
+      if (_lastHash && hash !== _lastHash) {
+        await refreshImages(true);
+      } else if (!_lastHash) {
+        _lastHash = hash;
+      }
+    } catch(e) {}
+  };
+
+  // ESC closes dup modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('dupModalOverlay')?.classList.contains('open')) {
+      document.getElementById('dupModalOverlay').classList.remove('open');
+    }
+  });
+
+
+  // ── LIGHTBOX FILTERS ──────────────────────────────────────────────────────
+
+  const FILTER_CLASSES = {
+    1: 'filter-original',
+    2: 'filter-highkey',
+    3: 'filter-midtone',
+    4: 'filter-lowkey',
+    5: 'filter-sepia',
+    6: 'filter-vivid',
+    7: 'filter-faded',
+    8: 'filter-warm',
+    9: 'filter-cool',
+    0: 'filter-negative',
+  };
+
+  let _currentFilter = 1;
+  let _hudTimer = null;
+
+  function setLightboxFilter(n) {
+    if (!FILTER_CLASSES[n]) return;
+    _currentFilter = n;
+    const img = document.getElementById('lightboxImg');
+
+    // Swap filter class
+    Object.values(FILTER_CLASSES).forEach(c => img.classList.remove(c));
+    img.classList.add(FILTER_CLASSES[n]);
+
+    // Update HUD active state
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById(`fk${i}`)?.classList.toggle('active', i === n);
+    }
+
+    showFilterHud();
+  }
+
+  function showFilterHud() {
+    const hud = document.getElementById('filterHud');
+    hud.classList.add('visible');
+    clearTimeout(_hudTimer);
+    // Auto-hide after 3s if on original, stay visible if filter active
+    if (_currentFilter === 1) {
+      _hudTimer = setTimeout(() => hud.classList.remove('visible'), 3000);
+    }
+  }
+
+  function hideFilterHud() {
+    const hud = document.getElementById('filterHud');
+    hud.classList.remove('visible');
+    clearTimeout(_hudTimer);
+  }
+
+  function resetLightboxFilter() {
+    _currentFilter = 1;
+    const img = document.getElementById('lightboxImg');
+    Object.values(FILTER_CLASSES).forEach(c => img.classList.remove(c));
+    img.classList.add('filter-original');
+    for (const i of [1,2,3,4,5,6,7,8,9,0]) {
+      document.getElementById(`fk${i}`)?.classList.toggle('active', i === 1);
+    }
+  }
+
+
+  // ── DELETE ────────────────────────────────────────────────────────────────
+
+  async function deleteImage(name) {
+    if (!confirm(`Delete ${name.split('/').pop()}?\nThis cannot be undone.`)) return false;
+
+    setStatus(`Deleting ${name.split('/').pop()}…`);
+    let res, data;
+    try {
+      res = await fetch('/api/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({file: name}),
+      });
+    } catch(e) {
+      setStatus(`✘ Delete failed: cannot reach server`);
+      alert('Delete failed: cannot reach server\n' + e.message);
+      return false;
+    }
+
+    const bodyText = await res.text();
+    setStatus(`Server responded: HTTP ${res.status} — ${bodyText.slice(0, 60)}`);
+
+    try {
+      data = JSON.parse(bodyText);
+    } catch(e) {
+      alert(`Delete failed: HTTP ${res.status}\nServer sent: ${bodyText.slice(0,200)}\n\nCheck the terminal.`);
+      return false;
+    }
+
+    if (!data.ok) {
+      setStatus(`✘ Delete failed: ${data.error || 'Unknown error'}`);
+      alert('Delete failed: ' + (data.error || 'Unknown error'));
+      return false;
+    }
+
+    // Remove from all in-memory lists
+    const idx = allImages.indexOf(name);
+    if (idx !== -1) allImages.splice(idx, 1);
+    const fidx = filteredImages.indexOf(name);
+    if (fidx !== -1) filteredImages.splice(fidx, 1);
+
+    // Remove from caches
+    delete thumbnails[name];
+    delete allTagsCache[name];
+    newFiles.delete(name);
+
+    // Adjust cursor
+    if (galleryCursor >= filteredImages.length) {
+      galleryCursor = filteredImages.length - 1;
+    }
+
+    // Update header count
+    document.getElementById('headerCount').textContent =
+      `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+
+    setStatus(`🗑 Deleted ${name.split('/').pop()} — ${allImages.length} images remaining`);
+    renderTagBadges();
+    rebuildFilterBar();
+
+    return true;
+  }
+
+  async function deleteCurrentImage() {
+    // Called from lightbox delete button or Del key
+    if (lightboxIndex < 0 || lightboxIndex >= filteredImages.length) return;
+    const name = filteredImages[lightboxIndex];
+    const ok   = await deleteImage(name);
+    if (!ok) return;
+
+    if (filteredImages.length === 0) {
+      closeLightbox();
+      renderGallery();
+      return;
+    }
+
+    // Stay in lightbox, move to next image (clamped)
+    const nextIdx = Math.min(lightboxIndex, filteredImages.length - 1);
+    renderGallery();
+    showLightboxImage(nextIdx);
+  }
+
+  // Wire context menu delete
+  document.getElementById('ctxDelete').addEventListener('click', async () => {
+    const name = ctxTarget;
+    hideCtxMenu();
+    if (!name) return;
+    const ok = await deleteImage(name);
+    if (ok) renderGallery();
+  });
+
+  // Del key — works in both gallery and lightbox
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key !== 'Delete') return;
+
+    const anyModal = ['metaModalOverlay','tagModalOverlay','renameModalOverlay',
+                      'logoutModalOverlay','dupModalOverlay'].some(id =>
+                        document.getElementById(id)?.classList.contains('open'));
+    if (anyModal) return;
+
+    e.preventDefault();
+    if (document.getElementById('lightbox').classList.contains('open')) {
+      deleteCurrentImage();
+    } else if (galleryCursor >= 0 && galleryCursor < filteredImages.length) {
+      const name = filteredImages[galleryCursor];
+      deleteImage(name).then(ok => { if (ok) renderGallery(); });
+    }
+  });
+
+
+  // ── RENAME ALL ────────────────────────────────────────────────────────────
+  async function renameAll() {
+    const btn = document.getElementById('renameAllBtn');
+    btn.textContent = '…';
+    btn.disabled = true;
+    setStatus('Renaming all non-conforming images…');
+    try {
+      const res  = await fetch('/api/rename-all', {method:'POST',
+        headers:{'Content-Type':'application/json'}, body:'{}'});
+      const data = await res.json();
+      if (data.ok) {
+        if (data.renamed === 0) {
+          setStatus('All images already correctly named ✔');
+        } else {
+          setStatus(`Renamed ${data.renamed} image(s) ✔`);
+          await refreshImages(false);
+        }
+      } else {
+        setStatus(`Rename failed: ${data.error}`);
+      }
+    } catch(e) {
+      setStatus(`Rename error: ${e.message}`);
+    } finally {
+      btn.textContent = 'rename';
+      btn.disabled = false;
+    }
+  }
+
+  init().then(async () => { await loadDuplicates(); startFolderWatch(); });
+</script>
+</body>
+</html>
