@@ -197,6 +197,20 @@
 
   .photo-card:hover img { transform: scale(1.04); filter: brightness(1.05); }
 
+  .video-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 2;
+    letter-spacing: 0.04em;
+  }
+
   .photo-card .overlay {
     position: absolute;
     bottom: 0;
@@ -2116,6 +2130,7 @@
   <button class="lightbox-delete" onclick="deleteCurrentImage()" title="Delete image (Del key)">🗑 Delete</button>
   <button class="lightbox-nav prev" onclick="lightboxNav(-1)">‹</button>
   <img id="lightboxImg" src="" alt="" class="filter-original">
+  <video id="lightboxVideo" controls style="display:none;max-width:95vw;max-height:90vh;outline:none"></video>
   <button class="lightbox-nav next" onclick="lightboxNav(1)">›</button>
 
   <!-- Filter HUD -->
@@ -2161,6 +2176,12 @@
   let lightboxIndex = -1;
   let ctxTarget = null; // file name that was right-clicked
 
+  const VIDEO_EXTS = new Set(['.mp4','.mov','.avi','.mkv','.webm','.m4v','.mts','.m2ts','.3gp']);
+  function isVideo(name) {
+    const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+    return VIDEO_EXTS.has(ext);
+  }
+
   async function init() {
     try {
       const res  = await fetch('/api/images');
@@ -2170,8 +2191,9 @@
 
       const ready = data.ready !== false;  // undefined = old server = treat as ready
 
-      document.getElementById('headerCount').textContent =
-        `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+      { const _hv = allImages.some(isVideo), _hl = _hv ? 'item' : 'image';
+        document.getElementById('headerCount').textContent =
+          `${allImages.length} ${_hl}${allImages.length !== 1 ? 's' : ''}`; }
 
       if (!ready && allImages.length === 0) {
         // Watcher is still indexing — show startup message and poll until ready
@@ -2259,7 +2281,9 @@
     card.style.animationDelay = `${Math.min(i * 20, 400)}ms`;
     card.dataset.name = name;
     card.dataset.idx  = i;
+    const videoBadge = isVideo(name) ? `<div class="video-badge">▶ video</div>` : '';
     card.innerHTML = `
+      ${videoBadge}
       <div class="loading-thumb" id="lt-${i}"><span class="loader"></span></div>
       <div class="overlay"><div class="fn">${escHtml(name)}</div></div>`;
     card.addEventListener('click', e => {
@@ -2384,21 +2408,33 @@
 
   function applyThumb(name, i, b64) {
     const src = `data:image/jpeg;base64,${b64}`;
+    const vid  = isVideo(name);
     // Grid
     const lt = document.getElementById(`lt-${i}`);
     if (lt) {
-      const img = document.createElement('img');
-      img.src = src;
-      img.alt = name;
-      lt.replaceWith(img);
+      if (vid) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'width:100%;height:100%;position:relative;background:#111';
+        const img = document.createElement('img');
+        img.src = src; img.alt = name;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;opacity:0.7';
+        const icon = document.createElement('div');
+        icon.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2rem;color:rgba(255,255,255,0.85);pointer-events:none';
+        icon.textContent = '▶';
+        wrap.append(img, icon);
+        lt.replaceWith(wrap);
+      } else {
+        const img = document.createElement('img');
+        img.src = src; img.alt = name;
+        lt.replaceWith(img);
+      }
     }
     // Strip
     const st = document.getElementById(`st-${i}`);
     if (st) {
       const img = document.createElement('img');
       img.className = 'strip-thumb';
-      img.src = src;
-      img.alt = name;
+      img.src = src; img.alt = name;
       st.replaceWith(img);
     }
   }
@@ -2533,12 +2569,32 @@
   function showLightboxImage(i) {
     if (i < 0 || i >= filteredImages.length) return;
     lightboxIndex = i;
-    galleryCursor = i; // keep gallery cursor in sync
+    galleryCursor = i;
     const name = filteredImages[i];
-    document.getElementById('lightboxImg').src = `/api/image?file=${encodeURIComponent(name)}`;
-    setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · 1-9, 0: filters`);
-    // Keep current filter when navigating — user can reset with 1
-    showFilterHud();
+    const url  = `/api/image?file=${encodeURIComponent(name)}`;
+    const img  = document.getElementById('lightboxImg');
+    const vid  = document.getElementById('lightboxVideo');
+    const fhud = document.getElementById('filterHud');
+
+    if (isVideo(name)) {
+      img.style.display = 'none';
+      img.src = '';
+      vid.style.display = '';
+      vid.pause();
+      vid.src = url;
+      vid.load();
+      fhud.style.display = 'none';
+      setStatus(`${name}  (${i + 1} / ${filteredImages.length})`);
+    } else {
+      vid.style.display = 'none';
+      vid.pause();
+      vid.src = '';
+      img.style.display = '';
+      img.src = url;
+      fhud.style.display = '';
+      setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · 1-9, 0: filters`);
+      showFilterHud();
+    }
   }
 
   function lightboxNav(dir) {
@@ -2550,9 +2606,11 @@
 
   function closeLightbox() {
     document.getElementById('lightbox').classList.remove('open');
+    const vid = document.getElementById('lightboxVideo');
+    vid.pause();
+    vid.src = '';
     resetLightboxFilter();
     hideFilterHud();
-    // Scroll the last-viewed card into view in the gallery
     const active = document.querySelector('.kb-focus');
     if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -3628,8 +3686,9 @@
       applyFilters();
       await loadAllTags();
 
-      document.getElementById('headerCount').textContent =
-        `${allImages.length} image${allImages.length !== 1 ? 's' : ''}`;
+      { const _hv = allImages.some(isVideo), _hl = _hv ? 'item' : 'image';
+        document.getElementById('headerCount').textContent =
+          `${allImages.length} ${_hl}${allImages.length !== 1 ? 's' : ''}`; }
 
       const parts = [];
       if (added.length)   parts.push(`+${added.length} added`);

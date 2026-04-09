@@ -7,7 +7,7 @@ __pycache__/
 *.pyo
 gallery-env/
 
-# Images
+# Images & video
 *.jpg
 *.jpeg
 *.png
@@ -24,6 +24,15 @@ gallery-env/
 *.rw2
 *.dng
 *.raw
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.m4v
+*.mts
+*.m2ts
+*.3gp
 
 # Generated files
 .thumbcache/

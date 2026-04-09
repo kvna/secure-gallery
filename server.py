@@ -35,7 +35,9 @@ except ImportError:
 # Set by start-gallery.sh via env; used for AES-256 zip encryption/decryption.
 GALLERY_PASSWORD: str = os.environ.get('GALLERY_PASSWORD', '')
 
-SUPPORTED_EXTENSIONS = {'.jpg','.jpeg','.png','.gif','.webp','.bmp','.tiff','.tif','.heic'}
+IMAGE_EXTENSIONS = {'.jpg','.jpeg','.png','.gif','.webp','.bmp','.tiff','.tif','.heic'}
+VIDEO_EXTENSIONS = {'.mp4','.mov','.avi','.mkv','.webm','.m4v','.mts','.m2ts','.3gp'}
+SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 PREVIOUS_SESSIONS_DIR = 'previous_sessions'
 DUPLICATES_DIR        = 'duplicates'
 SESSION_FOLDER        = '.gallery_session'   # fixed extraction dir, sibling of photos/
@@ -269,6 +271,68 @@ def make_thumbnail(filepath, photos_folder=None, image_rel=None, max_size=THUMB_
             print(f"  ✘  make_thumbnail failed for {filepath}: {e}", flush=True)
             traceback.print_exc()
             return None
+
+def make_video_thumbnail(filepath, photos_folder=None, image_rel=None):
+    """
+    Generate a thumbnail for a video file.
+    Tries ffmpeg first (best quality), falls back to a placeholder icon.
+    Returns base64-encoded JPEG string or None.
+    """
+    cache_path = None
+    if photos_folder and image_rel:
+        cache_path = _thumb_cache_path(Path(photos_folder), image_rel)
+        if cache_path.exists():
+            try:
+                return base64.b64encode(cache_path.read_bytes()).decode('ascii')
+            except Exception:
+                pass
+
+    with _thumb_semaphore:
+        # Try ffmpeg — extract frame at 0.5s
+        try:
+            import subprocess, tempfile
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                tmp_path = tmp.name
+            result = subprocess.run(
+                ['ffmpeg', '-y', '-ss', '00:00:01', '-i', str(filepath),
+                 '-vframes', '1', '-q:v', '3',
+                 '-vf', f'scale={THUMB_SIZE}:{THUMB_SIZE}:force_original_aspect_ratio=decrease',
+                 tmp_path],
+                capture_output=True, timeout=15
+            )
+            if result.returncode == 0 and Path(tmp_path).exists():
+                data = Path(tmp_path).read_bytes()
+                Path(tmp_path).unlink(missing_ok=True)
+                if cache_path:
+                    try:
+                        cache_path.parent.mkdir(parents=True, exist_ok=True)
+                        cache_path.write_bytes(data)
+                    except Exception:
+                        pass
+                return base64.b64encode(data).decode('ascii')
+            Path(tmp_path).unlink(missing_ok=True)
+        except (FileNotFoundError, Exception):
+            pass  # ffmpeg not available or failed
+
+        # Fallback: generate a simple dark placeholder with PIL
+        if HAS_PIL:
+            try:
+                img = Image.new('RGB', (THUMB_SIZE, THUMB_SIZE), color=(20, 20, 20))
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=70)
+                data = buf.getvalue()
+                if cache_path:
+                    try:
+                        cache_path.parent.mkdir(parents=True, exist_ok=True)
+                        cache_path.write_bytes(data)
+                    except Exception:
+                        pass
+                return base64.b64encode(data).decode('ascii')
+            except Exception:
+                pass
+
+    return None
+
 
 # ── IMAGE LIST ─────────────────────────────────────────────────────────────────
 
@@ -1276,13 +1340,42 @@ class GalleryHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin','*')
         self.end_headers(); self.wfile.write(body)
 
-    def send_file(self,filepath,content_type):
-        with open(filepath,'rb') as f: data=f.read()
-        self.send_response(200)
-        self.send_header('Content-Type',content_type)
-        self.send_header('Content-Length',len(data))
-        self.send_header('Cache-Control','public, max-age=3600')
-        self.end_headers(); self.wfile.write(data)
+    def send_file(self, filepath, content_type):
+        """Serve a file, supporting HTTP Range requests for video streaming."""
+        file_size = filepath.stat().st_size
+        range_header = self.headers.get('Range')
+
+        if range_header:
+            # Parse Range: bytes=start-end
+            try:
+                byte_range = range_header.strip().replace('bytes=', '')
+                start_str, end_str = byte_range.split('-')
+                start = int(start_str) if start_str else 0
+                end   = int(end_str)   if end_str   else file_size - 1
+                end   = min(end, file_size - 1)
+                length = end - start + 1
+                self.send_response(206)
+                self.send_header('Content-Type', content_type)
+                self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                self.send_header('Content-Length', str(length))
+                self.send_header('Accept-Ranges', 'bytes')
+                self.end_headers()
+                with open(filepath, 'rb') as f:
+                    f.seek(start)
+                    self.wfile.write(f.read(length))
+            except Exception:
+                self.send_response(416)
+                self.end_headers()
+        else:
+            with open(filepath, 'rb') as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.end_headers()
+            self.wfile.write(data)
 
     @property
     def folder(self): return SESSION.serve_folder
@@ -1412,8 +1505,11 @@ class GalleryHandler(BaseHTTPRequestHandler):
             if parts and parts[0] == DUPLICATES_DIR:
                 fp = dup_folder(self.folder) / Path(name).name
             if not fp.exists(): self.send_json({'error':'Not found'},404); return
-            thumb = make_thumbnail(fp, photos_folder=permanent_folder(), image_rel=name)
-            self.send_json({'thumbnail': thumb})
+            if fp.suffix.lower() in VIDEO_EXTENSIONS:
+                thumb = make_video_thumbnail(fp, photos_folder=permanent_folder(), image_rel=name)
+            else:
+                thumb = make_thumbnail(fp, photos_folder=permanent_folder(), image_rel=name)
+            self.send_json({'thumbnail': thumb, 'is_video': fp.suffix.lower() in VIDEO_EXTENSIONS})
 
         elif path=='/api/image':
             name=unquote(qs.get('file',[''])[0])
