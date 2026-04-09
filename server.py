@@ -334,6 +334,195 @@ def make_video_thumbnail(filepath, photos_folder=None, image_rel=None):
     return None
 
 
+# ── PILLOW FILTERS ────────────────────────────────────────────────────────────
+
+def _filter_cache_path(photos_folder: Path, image_rel: str, filter_id: str) -> Path:
+    safe = image_rel.replace('/', '__').replace('\\', '__')
+    return photos_folder / THUMB_CACHE_DIR / 'filters' / filter_id / (safe + '.jpg')
+
+
+def apply_image_filter(filepath: Path, filter_id: str,
+                       photos_folder: Path = None, image_rel: str = None) -> bytes | None:
+    """
+    Apply a named filter to an image using Pillow and return JPEG bytes.
+    Results are cached in .thumbcache/filters/<filter_id>/.
+    filter_id: '0'-'9', 'c0'-'c9', 'a0'-'a9'
+    Returns None for 'original' / '0' (caller should serve original).
+    """
+    if filter_id in ('0', 'original'):
+        return None   # caller serves original
+
+    if not HAS_PIL:
+        return None
+
+    # Check cache
+    cache_path = None
+    if photos_folder and image_rel:
+        cache_path = _filter_cache_path(Path(photos_folder), image_rel, filter_id)
+        if cache_path.exists():
+            try:
+                return cache_path.read_bytes()
+            except Exception:
+                pass
+
+    try:
+        from PIL import ImageEnhance, ImageFilter, ImageOps, ImageDraw
+        import struct
+
+        with Image.open(filepath) as src:
+            src.load()
+            img = src.copy()
+
+        # Apply EXIF orientation
+        try:
+            raw = img._getexif() if hasattr(img, '_getexif') else None
+            if raw:
+                for tid, val in raw.items():
+                    if ExifTags.TAGS.get(tid) == 'Orientation':
+                        degrees = {3:180, 6:270, 8:90}.get(val, 0)
+                        if degrees:
+                            img = img.rotate(degrees, expand=True)
+                        break
+        except Exception:
+            pass
+
+        # Ensure RGB for most operations
+        def to_rgb(i):
+            return i.convert('RGB') if i.mode != 'RGB' else i
+
+        img = to_rgb(img)
+
+        # ── 0–9: Core tonal ───────────────────────────────────────────────────
+        if filter_id == '1':    # Low key
+            img = ImageEnhance.Brightness(img).enhance(0.6)
+            img = ImageEnhance.Contrast(img).enhance(1.5)
+        elif filter_id == '2':  # High key
+            img = ImageEnhance.Brightness(img).enhance(1.5)
+            img = ImageEnhance.Contrast(img).enhance(0.65)
+        elif filter_id == '3':  # High contrast
+            img = ImageEnhance.Contrast(img).enhance(2.0)
+        elif filter_id == '4':  # Low contrast / flat
+            img = ImageEnhance.Contrast(img).enhance(0.45)
+            img = ImageEnhance.Brightness(img).enhance(1.1)
+        elif filter_id == '5':  # Brightness up
+            img = ImageEnhance.Brightness(img).enhance(1.45)
+        elif filter_id == '6':  # Brightness down
+            img = ImageEnhance.Brightness(img).enhance(0.55)
+        elif filter_id == '7':  # Sharpen
+            img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=3))
+        elif filter_id == '8':  # Blur
+            img = img.filter(ImageFilter.GaussianBlur(radius=3))
+        elif filter_id == '9':  # Threshold (pure B&W)
+            img = img.convert('L').point(lambda p: 255 if p > 128 else 0).convert('RGB')
+
+        # ── c0–c9: Colour & style presets ─────────────────────────────────────
+        elif filter_id == 'c0':  # Grayscale
+            img = ImageOps.grayscale(img).convert('RGB')
+        elif filter_id == 'c1':  # Sepia
+            g = ImageOps.grayscale(img)
+            r = g.point(lambda p: min(255, int(p * 1.08)))
+            gr = g.point(lambda p: min(255, int(p * 0.88)))
+            b  = g.point(lambda p: min(255, int(p * 0.68)))
+            img = Image.merge('RGB', (r, gr, b))
+        elif filter_id == 'c2':  # Warm
+            r, g, b = img.split()
+            r = r.point(lambda p: min(255, int(p * 1.15)))
+            g = g.point(lambda p: min(255, int(p * 1.03)))
+            b = b.point(lambda p: max(0,   int(p * 0.80)))
+            img = Image.merge('RGB', (r, g, b))
+        elif filter_id == 'c3':  # Cool
+            r, g, b = img.split()
+            r = r.point(lambda p: max(0,   int(p * 0.80)))
+            g = g.point(lambda p: min(255, int(p * 1.00)))
+            b = b.point(lambda p: min(255, int(p * 1.20)))
+            img = Image.merge('RGB', (r, g, b))
+        elif filter_id == 'c4':  # Desaturate
+            img = ImageEnhance.Color(img).enhance(0.15)
+        elif filter_id == 'c5':  # Saturation boost
+            img = ImageEnhance.Color(img).enhance(2.2)
+        elif filter_id == 'c6':  # Posterize
+            img = ImageOps.posterize(img, 3)
+        elif filter_id == 'c7':  # Solarize
+            img = ImageOps.solarize(img, threshold=128)
+        elif filter_id == 'c8':  # Invert
+            img = ImageOps.invert(img)
+        elif filter_id == 'c9':  # Duotone (dark navy → warm amber)
+            g = ImageOps.grayscale(img)
+            dark  = (20,  30,  60)   # shadow colour
+            light = (240, 190, 100)  # highlight colour
+            lut_r = bytes([int(dark[0] + (light[0]-dark[0]) * i/255) for i in range(256)])
+            lut_g = bytes([int(dark[1] + (light[1]-dark[1]) * i/255) for i in range(256)])
+            lut_b = bytes([int(dark[2] + (light[2]-dark[2]) * i/255) for i in range(256)])
+            r = g.point(lut_r)
+            gch = g.point(lut_g)
+            b  = g.point(lut_b)
+            img = Image.merge('RGB', (r, gch, b))
+
+        # ── a0–a9: Analysis / structural ──────────────────────────────────────
+        elif filter_id == 'a0':  # Edge detection
+            img = ImageOps.grayscale(img).filter(ImageFilter.FIND_EDGES).convert('RGB')
+        elif filter_id == 'a1':  # Emboss
+            img = img.filter(ImageFilter.EMBOSS).convert('RGB')
+        elif filter_id == 'a2':  # Contour
+            img = ImageOps.grayscale(img).filter(ImageFilter.CONTOUR).convert('RGB')
+        elif filter_id == 'a3':  # Luminance map
+            img = ImageOps.grayscale(img).convert('RGB')
+        elif filter_id == 'a4':  # Red channel
+            r, g, b = img.split()
+            img = Image.merge('RGB', (r, Image.new('L', r.size, 0), Image.new('L', r.size, 0)))
+        elif filter_id == 'a5':  # Green channel
+            r, g, b = img.split()
+            img = Image.merge('RGB', (Image.new('L', g.size, 0), g, Image.new('L', g.size, 0)))
+        elif filter_id == 'a6':  # Blue channel
+            r, g, b = img.split()
+            img = Image.merge('RGB', (Image.new('L', b.size, 0), Image.new('L', b.size, 0), b))
+        elif filter_id == 'a7':  # Pixelate
+            w, h = img.size
+            small = max(1, w // 30), max(1, h // 30)
+            img = img.resize(small, Image.NEAREST).resize((w, h), Image.NEAREST)
+        elif filter_id == 'a8':  # Sketch
+            edges = ImageOps.grayscale(img).filter(ImageFilter.FIND_EDGES)
+            img = ImageOps.invert(edges).filter(ImageFilter.GaussianBlur(0.8)).convert('RGB')
+        elif filter_id == 'a9':  # Palette view (dominant 12 colours as swatches)
+            small = img.resize((150, 150))
+            quantized = small.quantize(colors=12, method=Image.Quantize.FASTOCTREE)
+            palette_rgb = quantized.getpalette()[:12*3]
+            colours = [(palette_rgb[i*3], palette_rgb[i*3+1], palette_rgb[i*3+2])
+                       for i in range(12)]
+            w, h = img.size
+            swatch_w = w // 6
+            swatch_h = max(60, h // 8)
+            canvas = img.copy()
+            draw = ImageDraw.Draw(canvas)
+            for idx, col in enumerate(colours):
+                row = idx // 6
+                col_pos = idx % 6
+                x0 = col_pos * swatch_w
+                y0 = h - swatch_h * (2 - row)
+                draw.rectangle([x0, y0, x0+swatch_w, y0+swatch_h], fill=col)
+            img = canvas
+
+        else:
+            return None  # Unknown filter — caller serves original
+
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=88)
+        data = buf.getvalue()
+
+        if cache_path:
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_bytes(data)
+            except Exception:
+                pass
+
+        return data
+
+    except Exception as e:
+        print(f"  ✘  apply_image_filter({filter_id}) failed: {e}", flush=True)
+        return None
+
+
 # ── IMAGE LIST ─────────────────────────────────────────────────────────────────
 
 # Top-level subfolders never shown in the gallery
@@ -1439,6 +1628,29 @@ class GalleryHandler(BaseHTTPRequestHandler):
             # Clear just the in-memory log (files stay in duplicates/)
             _dup_log.clear()
             self.send_json({'ok':True})
+
+        elif path=='/api/filter':
+            name      = unquote(qs.get('file',[''])[0])
+            filter_id = qs.get('filter',['0'])[0].lower()
+            if not name: self.send_json({'error':'No file'},400); return
+            fp = self.folder/name
+            if not fp.exists() or fp.suffix.lower() not in IMAGE_EXTENSIONS:
+                self.send_json({'error':'Not found'},404); return
+            if filter_id in ('0','original'):
+                # Serve original
+                mime,_ = mimetypes.guess_type(str(fp))
+                self.send_file(fp, mime or 'image/jpeg'); return
+            data = apply_image_filter(fp, filter_id,
+                                      photos_folder=permanent_folder(), image_rel=name)
+            if data is None:
+                mime,_ = mimetypes.guess_type(str(fp))
+                self.send_file(fp, mime or 'image/jpeg'); return
+            self.send_response(200)
+            self.send_header('Content-Type','image/jpeg')
+            self.send_header('Content-Length',str(len(data)))
+            self.send_header('Cache-Control','public, max-age=3600')
+            self.end_headers()
+            self.wfile.write(data)
 
         elif path=='/api/images/watch':
             if MINIMAL_MODE:

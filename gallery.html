@@ -1822,10 +1822,9 @@
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: 90vw;
-    gap: 6px;
+    flex-direction: column;
+    gap: 4px;
+    width: min(98vw, 900px);
     z-index: 1010;
     opacity: 0;
     transition: opacity 0.3s;
@@ -1833,6 +1832,28 @@
   }
   .lightbox.open .lightbox-filter-hud { pointer-events: auto; }
   .lightbox-filter-hud.visible { opacity: 1; }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-row-label {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    white-space: nowrap;
+    min-width: 52px;
+    text-align: right;
+    padding-right: 4px;
+  }
 
   .filter-key {
     display: flex;
@@ -1913,35 +1934,10 @@
     font-size: 0.6rem;
   }
 
-  /* The actual CSS filter classes applied to the image */
-  #lightboxImg.filter-original  { filter: none; }
-  #lightboxImg.filter-highkey   {
-    filter: grayscale(1) brightness(1.35) contrast(0.75);
-  }
-  #lightboxImg.filter-midtone   {
-    filter: grayscale(1) brightness(1.0) contrast(1.05);
-  }
-  #lightboxImg.filter-lowkey    {
-    filter: grayscale(1) brightness(0.65) contrast(1.45);
-  }
-  #lightboxImg.filter-sepia     {
-    filter: sepia(1) brightness(1.05) contrast(0.9);
-  }
-  #lightboxImg.filter-vivid     {
-    filter: contrast(1.35) saturate(1.4);
-  }
-  #lightboxImg.filter-faded     {
-    filter: contrast(0.8) brightness(1.12) saturate(0.75);
-  }
-  #lightboxImg.filter-warm      {
-    filter: saturate(1.2) hue-rotate(-20deg) brightness(1.05);
-  }
-  #lightboxImg.filter-cool      {
-    filter: saturate(0.9) hue-rotate(20deg) brightness(1.05);
-  }
-  #lightboxImg.filter-negative  {
-    filter: invert(1);
-  }
+  /* Lightbox image — no CSS filters, all processing is server-side */
+  #lightboxImg { filter: none; }
+  #lightboxImg.filter-loading { opacity: 0.5; transition: opacity 0.15s; }
+
 
 
   /* ── DELETE BUTTON ───────────────────────────────────────────────────── */
@@ -2217,35 +2213,47 @@
 
   <!-- Filter HUD -->
   <div class="lightbox-filter-hud" id="filterHud">
-    <div class="filter-key active" id="fk1" onclick="setLightboxFilter(1)">
-      <kbd>1</kbd> Original
+    <!-- Row 1: Core (0-9) -->
+    <div class="filter-row">
+      <span class="filter-row-label">Core</span>
+      <div class="filter-key active" id="fk-0"  onclick="setLightboxFilter('0')"><kbd>0</kbd> Original</div>
+      <div class="filter-key"        id="fk-1"  onclick="setLightboxFilter('1')"><kbd>1</kbd> Low Key</div>
+      <div class="filter-key"        id="fk-2"  onclick="setLightboxFilter('2')"><kbd>2</kbd> High Key</div>
+      <div class="filter-key"        id="fk-3"  onclick="setLightboxFilter('3')"><kbd>3</kbd> Hi Contrast</div>
+      <div class="filter-key"        id="fk-4"  onclick="setLightboxFilter('4')"><kbd>4</kbd> Flat</div>
+      <div class="filter-key"        id="fk-5"  onclick="setLightboxFilter('5')"><kbd>5</kbd> Brighter</div>
+      <div class="filter-key"        id="fk-6"  onclick="setLightboxFilter('6')"><kbd>6</kbd> Darker</div>
+      <div class="filter-key"        id="fk-7"  onclick="setLightboxFilter('7')"><kbd>7</kbd> Sharpen</div>
+      <div class="filter-key"        id="fk-8"  onclick="setLightboxFilter('8')"><kbd>8</kbd> Blur</div>
+      <div class="filter-key"        id="fk-9"  onclick="setLightboxFilter('9')"><kbd>9</kbd> Threshold</div>
     </div>
-    <div class="filter-key" id="fk2" onclick="setLightboxFilter(2)">
-      <kbd>2</kbd> High Key
+    <!-- Row 2: Colour (Ctrl+0-9) -->
+    <div class="filter-row">
+      <span class="filter-row-label">⌃ Colour</span>
+      <div class="filter-key" id="fk-c0" onclick="setLightboxFilter('c0')"><kbd>⌃0</kbd> Grayscale</div>
+      <div class="filter-key" id="fk-c1" onclick="setLightboxFilter('c1')"><kbd>⌃1</kbd> Sepia</div>
+      <div class="filter-key" id="fk-c2" onclick="setLightboxFilter('c2')"><kbd>⌃2</kbd> Warm</div>
+      <div class="filter-key" id="fk-c3" onclick="setLightboxFilter('c3')"><kbd>⌃3</kbd> Cool</div>
+      <div class="filter-key" id="fk-c4" onclick="setLightboxFilter('c4')"><kbd>⌃4</kbd> Desaturate</div>
+      <div class="filter-key" id="fk-c5" onclick="setLightboxFilter('c5')"><kbd>⌃5</kbd> Saturate</div>
+      <div class="filter-key" id="fk-c6" onclick="setLightboxFilter('c6')"><kbd>⌃6</kbd> Posterize</div>
+      <div class="filter-key" id="fk-c7" onclick="setLightboxFilter('c7')"><kbd>⌃7</kbd> Solarize</div>
+      <div class="filter-key" id="fk-c8" onclick="setLightboxFilter('c8')"><kbd>⌃8</kbd> Invert</div>
+      <div class="filter-key" id="fk-c9" onclick="setLightboxFilter('c9')"><kbd>⌃9</kbd> Duotone</div>
     </div>
-    <div class="filter-key" id="fk3" onclick="setLightboxFilter(3)">
-      <kbd>3</kbd> Mid Tone
-    </div>
-    <div class="filter-key" id="fk4" onclick="setLightboxFilter(4)">
-      <kbd>4</kbd> Low Key
-    </div>
-    <div class="filter-key" id="fk5" onclick="setLightboxFilter(5)">
-      <kbd>5</kbd> Sepia
-    </div>
-    <div class="filter-key" id="fk6" onclick="setLightboxFilter(6)">
-      <kbd>6</kbd> Vivid
-    </div>
-    <div class="filter-key" id="fk7" onclick="setLightboxFilter(7)">
-      <kbd>7</kbd> Faded
-    </div>
-    <div class="filter-key" id="fk8" onclick="setLightboxFilter(8)">
-      <kbd>8</kbd> Warm
-    </div>
-    <div class="filter-key" id="fk9" onclick="setLightboxFilter(9)">
-      <kbd>9</kbd> Cool
-    </div>
-    <div class="filter-key" id="fk0" onclick="setLightboxFilter(0)">
-      <kbd>0</kbd> Negative
+    <!-- Row 3: Analysis (Alt+0-9) -->
+    <div class="filter-row">
+      <span class="filter-row-label">⌥ Analysis</span>
+      <div class="filter-key" id="fk-a0" onclick="setLightboxFilter('a0')"><kbd>⌥0</kbd> Edges</div>
+      <div class="filter-key" id="fk-a1" onclick="setLightboxFilter('a1')"><kbd>⌥1</kbd> Emboss</div>
+      <div class="filter-key" id="fk-a2" onclick="setLightboxFilter('a2')"><kbd>⌥2</kbd> Contour</div>
+      <div class="filter-key" id="fk-a3" onclick="setLightboxFilter('a3')"><kbd>⌥3</kbd> Luminance</div>
+      <div class="filter-key" id="fk-a4" onclick="setLightboxFilter('a4')"><kbd>⌥4</kbd> Red</div>
+      <div class="filter-key" id="fk-a5" onclick="setLightboxFilter('a5')"><kbd>⌥5</kbd> Green</div>
+      <div class="filter-key" id="fk-a6" onclick="setLightboxFilter('a6')"><kbd>⌥6</kbd> Blue</div>
+      <div class="filter-key" id="fk-a7" onclick="setLightboxFilter('a7')"><kbd>⌥7</kbd> Pixelate</div>
+      <div class="filter-key" id="fk-a8" onclick="setLightboxFilter('a8')"><kbd>⌥8</kbd> Sketch</div>
+      <div class="filter-key" id="fk-a9" onclick="setLightboxFilter('a9')"><kbd>⌥9</kbd> Palette</div>
     </div>
   </div>
 
@@ -2750,10 +2758,20 @@
       vid.pause();
       vid.src = '';
       img.style.display = '';
-      img.src = url;
       hideVideoHud();
       fhud.style.display = '';
-      setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · scroll: navigate  Ctrl+←→: ±10%  Alt+←→: ±20%  1-9: filters`);
+      // Apply active filter (or original) for the new image
+      if (_currentFilter !== '0') {
+        img.classList.add('filter-loading');
+        img.src = `/api/filter?file=${encodeURIComponent(name)}&filter=${encodeURIComponent(_currentFilter)}`;
+        img.onload = () => img.classList.remove('filter-loading');
+      } else {
+        img.classList.remove('filter-loading');
+        img.src = url;
+      }
+      _currentFilterFile = name;
+      _updateFilterHudActive();
+      setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · scroll: navigate  Ctrl+←→: ±10%  Alt+←→: ±20%  0-9/⌃/⌥: filters`);
       showFilterHud();
     }
   }
@@ -2969,9 +2987,11 @@
             lightboxNav(dir);
           }
         }
-        if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key) && !e.ctrlKey && !e.altKey) {
+        if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key)) {
           e.preventDefault();
-          setLightboxFilter(parseInt(e.key));
+          if (e.ctrlKey)      setLightboxFilter('c' + e.key);
+          else if (e.altKey)  setLightboxFilter('a' + e.key);
+          else                setLightboxFilter(e.key);
         }
       }
       return;
@@ -4312,47 +4332,45 @@
   });
 
 
-  // ── LIGHTBOX FILTERS ──────────────────────────────────────────────────────
+  // ── LIGHTBOX FILTERS (server-side via /api/filter) ───────────────────────
 
-  const FILTER_CLASSES = {
-    1: 'filter-original',
-    2: 'filter-highkey',
-    3: 'filter-midtone',
-    4: 'filter-lowkey',
-    5: 'filter-sepia',
-    6: 'filter-vivid',
-    7: 'filter-faded',
-    8: 'filter-warm',
-    9: 'filter-cool',
-    0: 'filter-negative',
-  };
-
-  let _currentFilter = 1;
+  let _currentFilter = '0';   // '0' = original, '1'-'9', 'c0'-'c9', 'a0'-'a9'
+  let _currentFilterFile = '';// filename the filter was applied to
   let _hudTimer = null;
 
-  function setLightboxFilter(n) {
-    if (!FILTER_CLASSES[n]) return;
-    _currentFilter = n;
-    const img = document.getElementById('lightboxImg');
+  async function setLightboxFilter(filterId) {
+    _currentFilter = String(filterId);
+    const img  = document.getElementById('lightboxImg');
+    const name = lightboxIndex >= 0 ? filteredImages[lightboxIndex] : '';
+    if (!name) return;
 
-    // Swap filter class
-    Object.values(FILTER_CLASSES).forEach(c => img.classList.remove(c));
-    img.classList.add(FILTER_CLASSES[n]);
+    _currentFilterFile = name;
+    _updateFilterHudActive();
 
-    // Update HUD active state
-    for (let i = 1; i <= 4; i++) {
-      document.getElementById(`fk${i}`)?.classList.toggle('active', i === n);
+    if (_currentFilter === '0') {
+      img.classList.remove('filter-loading');
+      img.src = `/api/image?file=${encodeURIComponent(name)}`;
+    } else {
+      img.classList.add('filter-loading');
+      img.src = `/api/filter?file=${encodeURIComponent(name)}&filter=${encodeURIComponent(_currentFilter)}`;
+      img.onload = () => img.classList.remove('filter-loading');
     }
 
     showFilterHud();
+  }
+
+  function _updateFilterHudActive() {
+    document.querySelectorAll('#filterHud .filter-key').forEach(el => {
+      el.classList.remove('active');
+    });
+    document.getElementById(`fk-${_currentFilter}`)?.classList.add('active');
   }
 
   function showFilterHud() {
     const hud = document.getElementById('filterHud');
     hud.classList.add('visible');
     clearTimeout(_hudTimer);
-    // Auto-hide after 3s if on original, stay visible if filter active
-    if (_currentFilter === 1) {
+    if (_currentFilter === '0') {
       _hudTimer = setTimeout(() => hud.classList.remove('visible'), 3000);
     }
   }
@@ -4364,13 +4382,11 @@
   }
 
   function resetLightboxFilter() {
-    _currentFilter = 1;
+    _currentFilter = '0';
+    _currentFilterFile = '';
     const img = document.getElementById('lightboxImg');
-    Object.values(FILTER_CLASSES).forEach(c => img.classList.remove(c));
-    img.classList.add('filter-original');
-    for (const i of [1,2,3,4,5,6,7,8,9,0]) {
-      document.getElementById(`fk${i}`)?.classList.toggle('active', i === 1);
-    }
+    img.classList.remove('filter-loading');
+    _updateFilterHudActive();
   }
 
 
