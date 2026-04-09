@@ -1787,7 +1787,7 @@
   }
 
 
-  /* ── LIGHTBOX FILTERS ────────────────────────────────────────────────── */
+  /* ── LIGHTBOX HUDS (filters + video controls) ───────────────────────── */
   .lightbox-filter-hud {
     position: fixed;
     bottom: 60px;
@@ -1829,6 +1829,55 @@
     background: rgba(212,168,83,0.12);
   }
   .filter-key kbd {
+    background: rgba(255,255,255,0.12);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+  }
+
+  /* Video controls HUD — same position/style as filter HUD */
+  .lightbox-video-hud {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90vw;
+    gap: 6px;
+    z-index: 1010;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .lightbox.open .lightbox-video-hud { pointer-events: auto; }
+  .lightbox-video-hud.visible { opacity: 1; }
+
+  .video-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .video-ctrl:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.3); }
+  .video-ctrl.active {
+    color: var(--accent);
+    border-color: var(--accent2);
+    background: rgba(212,168,83,0.12);
+  }
+  .video-ctrl kbd {
     background: rgba(255,255,255,0.12);
     border-radius: 3px;
     padding: 1px 5px;
@@ -2164,6 +2213,49 @@
     </div>
     <div class="filter-key" id="fk0" onclick="setLightboxFilter(0)">
       <kbd>0</kbd> Negative
+    </div>
+  </div>
+
+  <!-- Video controls HUD -->
+  <div class="lightbox-video-hud" id="videoHud">
+    <div class="video-ctrl" onclick="videoCtrlPlayPause()">
+      <kbd>Space</kbd> Play / Pause
+    </div>
+    <div class="video-ctrl" id="vctrlMute" onclick="videoCtrlMute()">
+      <kbd>M</kbd> Mute
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlFullscreen()">
+      <kbd>F</kbd> Fullscreen
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(0)">
+      <kbd>0</kbd> Start
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(10)">
+      <kbd>1</kbd> 10%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(20)">
+      <kbd>2</kbd> 20%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(30)">
+      <kbd>3</kbd> 30%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(40)">
+      <kbd>4</kbd> 40%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(50)">
+      <kbd>5</kbd> 50%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(60)">
+      <kbd>6</kbd> 60%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(70)">
+      <kbd>7</kbd> 70%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(80)">
+      <kbd>8</kbd> 80%
+    </div>
+    <div class="video-ctrl" onclick="videoCtrlJump(90)">
+      <kbd>9</kbd> 90%
     </div>
   </div>
 </div>
@@ -2584,13 +2676,15 @@
       vid.src = url;
       vid.load();
       fhud.style.display = 'none';
-      setStatus(`${name}  (${i + 1} / ${filteredImages.length})`);
+      showVideoHud();
+      setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · Space: play  M: mute  F: fullscreen  1-9: jump`);
     } else {
       vid.style.display = 'none';
       vid.pause();
       vid.src = '';
       img.style.display = '';
       img.src = url;
+      hideVideoHud();
       fhud.style.display = '';
       setStatus(`${name}  (${i + 1} / ${filteredImages.length})  · 1-9, 0: filters`);
       showFilterHud();
@@ -2611,6 +2705,7 @@
     vid.src = '';
     resetLightboxFilter();
     hideFilterHud();
+    hideVideoHud();
     const active = document.querySelector('.kb-focus');
     if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -2750,14 +2845,32 @@
     // ── LIGHTBOX keys ──────────────────────────────────────────────────────
     if (inLightbox) {
       if (e.key === 'ArrowUp') { e.preventDefault(); closeLightbox(); }
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        lightboxNav(e.key === 'ArrowLeft' ? -1 : 1);
-      }
-      // 1-4: colour/greyscale filters
-      if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key)) {
-        e.preventDefault();
-        setLightboxFilter(parseInt(e.key));
+
+      const _vidActive = lightboxIndex >= 0 && isVideo(filteredImages[lightboxIndex]);
+
+      if (_vidActive) {
+        // Video-specific keys
+        if (e.key === ' ') { e.preventDefault(); videoCtrlPlayPause(); }
+        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); videoCtrlMute(); }
+        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); videoCtrlFullscreen(); }
+        if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key)) {
+          e.preventDefault();
+          videoCtrlJump(parseInt(e.key) * 10);
+        }
+        // Arrow left/right still navigates between files
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          lightboxNav(e.key === 'ArrowLeft' ? -1 : 1);
+        }
+      } else {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          lightboxNav(e.key === 'ArrowLeft' ? -1 : 1);
+        }
+        if (['0','1','2','3','4','5','6','7','8','9'].includes(e.key)) {
+          e.preventDefault();
+          setLightboxFilter(parseInt(e.key));
+        }
       }
       return;
     }
@@ -4152,6 +4265,57 @@
     }
   }
 
+
+  // ── VIDEO HUD ─────────────────────────────────────────────────────────────
+
+  let _videoHudTimer = null;
+
+  function showVideoHud() {
+    const hud = document.getElementById('videoHud');
+    hud.classList.add('visible');
+    clearTimeout(_videoHudTimer);
+    _videoHudTimer = setTimeout(() => hud.classList.remove('visible'), 4000);
+  }
+
+  function hideVideoHud() {
+    const hud = document.getElementById('videoHud');
+    hud.classList.remove('visible');
+    clearTimeout(_videoHudTimer);
+  }
+
+  function videoCtrlPlayPause() {
+    const vid = document.getElementById('lightboxVideo');
+    if (!vid || vid.style.display === 'none') return;
+    vid.paused ? vid.play() : vid.pause();
+    showVideoHud();
+  }
+
+  function videoCtrlMute() {
+    const vid = document.getElementById('lightboxVideo');
+    if (!vid || vid.style.display === 'none') return;
+    vid.muted = !vid.muted;
+    const btn = document.getElementById('vctrlMute');
+    if (btn) btn.classList.toggle('active', vid.muted);
+    showVideoHud();
+  }
+
+  function videoCtrlFullscreen() {
+    const vid = document.getElementById('lightboxVideo');
+    if (!vid || vid.style.display === 'none') return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      vid.requestFullscreen().catch(() => {});
+    }
+    showVideoHud();
+  }
+
+  function videoCtrlJump(pct) {
+    const vid = document.getElementById('lightboxVideo');
+    if (!vid || vid.style.display === 'none' || !vid.duration) return;
+    vid.currentTime = (pct / 100) * vid.duration;
+    showVideoHud();
+  }
 
   // ── DELETE ────────────────────────────────────────────────────────────────
 
