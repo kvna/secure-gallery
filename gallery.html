@@ -114,6 +114,34 @@
     border-color: var(--border2);
   }
 
+  .media-toggle {
+    display: none;   /* shown via JS when gallery has mixed media */
+    align-items: center;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 2px;
+  }
+  .media-toggle.visible { display: flex; }
+  .media-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .media-btn.active {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
   .search-wrap {
     position: relative;
   }
@@ -1957,6 +1985,11 @@
     <span class="search-icon">⌕</span>
     <input class="search-input" type="text" id="searchInput" placeholder="Filter by name…">
   </div>
+  <div class="media-toggle" id="mediaToggle">
+    <button class="media-btn active" id="mbAll"    onclick="setMediaFilter('all')">All</button>
+    <button class="media-btn"        id="mbImages" onclick="setMediaFilter('images')">Photos</button>
+    <button class="media-btn"        id="mbVideos" onclick="setMediaFilter('videos')">Videos</button>
+  </div>
   <div class="view-toggle">
     <button class="view-btn active" id="btnGrid" onclick="setView('grid')">Grid</button>
     <button class="view-btn" id="btnStrip" onclick="setView('strip')">List</button>
@@ -2274,6 +2307,25 @@
     return VIDEO_EXTS.has(ext);
   }
 
+  let mediaFilter = 'all'; // 'all' | 'images' | 'videos'
+
+  function setMediaFilter(mode) {
+    mediaFilter = mode;
+    document.getElementById('mbAll').classList.toggle('active',    mode === 'all');
+    document.getElementById('mbImages').classList.toggle('active', mode === 'images');
+    document.getElementById('mbVideos').classList.toggle('active', mode === 'videos');
+    applyFilters();
+  }
+
+  function _updateMediaToggle() {
+    const hasVids  = allImages.some(isVideo);
+    const hasImgs  = allImages.some(n => !isVideo(n));
+    const mixed    = hasVids && hasImgs;
+    document.getElementById('mediaToggle').classList.toggle('visible', mixed);
+    // If gallery no longer has mixed content, reset to all
+    if (!mixed && mediaFilter !== 'all') setMediaFilter('all');
+  }
+
   async function init() {
     try {
       const res  = await fetch('/api/images');
@@ -2303,6 +2355,7 @@
         return;   // pollFolderHash will call refreshImages when ready=true
       }
 
+      _updateMediaToggle();
       setStatus(`${allImages.length} images`);
       renderGallery();
       await loadAllTags();
@@ -3256,6 +3309,10 @@
     const searchQ = document.getElementById('searchInput').value.toLowerCase().trim();
 
     filteredImages = allImages.filter(name => {
+      // Media type filter
+      if (mediaFilter === 'images' &&  isVideo(name)) return false;
+      if (mediaFilter === 'videos' && !isVideo(name)) return false;
+
       // Text search
       if (searchQ && !name.toLowerCase().includes(searchQ)) return false;
 
@@ -3278,16 +3335,18 @@
     const inner = document.getElementById('galleryInner');
 
     if (filteredImages.length === 0) {
+      const emptyLabel = mediaFilter === 'videos' ? 'videos' : mediaFilter === 'images' ? 'photos' : 'items';
       inner.innerHTML = `<div class="empty-state">
         <div class="empty-icon">◻</div>
-        <h2>No images match</h2>
+        <h2>No ${emptyLabel} match</h2>
         <p>Try a different filter combination</p>
       </div>`;
-      setStatus(`0 of ${allImages.length} images match`);
+      setStatus(`0 of ${allImages.length} items match`);
       return;
     }
 
-    setStatus(`${filteredImages.length} of ${allImages.length} images`);
+    const mLabel = mediaFilter === 'videos' ? 'videos' : mediaFilter === 'images' ? 'photos' : 'items';
+    setStatus(`${filteredImages.length} of ${allImages.length} ${mLabel}`);
     renderGallery();
   }
 
