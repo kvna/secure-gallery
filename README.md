@@ -20,7 +20,7 @@ A self-hosted, encrypted local photo gallery. Each gallery lives in its own encr
 ## Quick Start
 
 ```bash
-git clone https://github.com/GaryKirkpatrickNI/secure-gallery.git
+git clone https://github.com/kvna/secure-gallery.git
 cd secure-gallery
 chmod +x firstrun.sh
 ./firstrun.sh
